@@ -2,7 +2,7 @@
   "name": "Chicken Attack — Space Poultry Shooter",
   "short_name": "Chicken Attack",
   "description": "A mobile-first arcade shooter: blast waves of invading space chickens, collect drumsticks, upgrade nine weapons and roast the boss hens.",
-  "id": "/chicken-attack/",
+  "id": ".",
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",

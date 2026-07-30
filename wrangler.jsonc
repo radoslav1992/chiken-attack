@@ -1,0 +1,26 @@
+{
+  // Cloudflare Workers with static assets: everything in public/ is served
+  // as-is. There is no build step and no Worker script, so this is an
+  // "assets-only" Worker.
+  //
+  //   npm install          # once, for wrangler
+  //   npm run dev          # local preview with _headers applied
+  //   npm run deploy       # deploy to Cloudflare
+  //
+  // Cloudflare Pages works too, see README.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chicken-attack",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./public",
+    // Serve /index.html for "/" and strip .html from URLs.
+    "html_handling": "auto-trailing-slash",
+    // The game has no client-side routing, and index.html links its assets
+    // relatively, so an SPA fallback would answer /any/deep/path with a shell
+    // whose relative asset URLs 404. Serve the branded 404 page instead.
+    "not_found_handling": "404-page"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

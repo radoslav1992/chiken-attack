@@ -9,19 +9,64 @@ Everything — sprites, sound effects, music and icons — is generated procedur
 
 ## Play it
 
-Any static host works. Locally:
+Any static host works — the deployable site is the `public/` directory.
 
 ```bash
-python3 -m http.server 8000      # or: npx serve .
+npm run serve        # python3 -m http.server 8000 --directory public
 # then open http://localhost:8000
 ```
 
-For GitHub Pages, enable Pages on the branch root — `index.html`, `manifest.webmanifest` and
-`sw.js` all use relative paths, so it works from a subdirectory too.
+## Deploy to Cloudflare
 
-Installing: open the site on a phone and use *Add to Home Screen*, or press **Install App** on the
-landing page where the browser supports it. After the first load the service worker keeps the game
-runnable with no network.
+The repo is configured for **Cloudflare Workers static assets** (`wrangler.jsonc`
+points at `public/`). There is no build step, so a deploy is just an upload.
+
+```bash
+npm install          # once, for wrangler
+npm run dev          # local preview at http://localhost:8787 with _headers applied
+npm run deploy       # wrangler deploy
+```
+
+The first `npm run deploy` prompts for a browser login and creates a
+`chicken-attack.<your-subdomain>.workers.dev` site; add a custom domain from the
+Worker's dashboard **Settings → Domains & Routes** when you want one. Rename the
+project by editing `name` in `wrangler.jsonc`.
+
+**Cloudflare Pages** works equally well if you prefer it:
+
+```bash
+npm run deploy:pages           # wrangler pages deploy public
+```
+
+Or connect the repository in the Pages dashboard and use:
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | None |
+| Build command | *(leave empty)* |
+| Build output directory | `public` |
+
+**CI deploys.** `.github/workflows/deploy-cloudflare.yml` deploys on every push
+to `main` once two repository secrets exist: `CLOUDFLARE_API_TOKEN` (use the
+*Edit Cloudflare Workers* template) and `CLOUDFLARE_ACCOUNT_ID`. Without them the
+job logs a notice and passes, so forks never see red builds.
+
+### What the Cloudflare config does
+
+- `public/_headers` sets the security headers (including a strict CSP with no
+  `unsafe-inline`) and the cache policy. Filenames are not content-hashed, so
+  HTML, JS and CSS are served `must-revalidate` and only icons get a long TTL —
+  otherwise a redeploy would leave players on a half-updated set of modules.
+  Offline play comes from the service worker, not from browser cache lifetimes.
+- `not_found_handling: "404-page"` serves `public/404.html`. An SPA fallback
+  would be wrong here: the game has no client-side routing and `index.html`
+  links its assets relatively, so a shell served at `/some/deep/path` would
+  fetch `/some/deep/css/styles.css` and break.
+- Offline, the service worker answers navigations from cache; a deep link whose
+  origin is unreachable is redirected to the app root so relative URLs resolve.
+
+After changing any file under `public/`, bump `VERSION` in `public/sw.js` so
+installed clients pick the new bundle up on their next visit.
 
 ## Controls
 
@@ -76,29 +121,35 @@ runnable with no network.
 ## Layout
 
 ```
-index.html                 landing page + overlays (menu, how-to, scores, settings, pause, results)
-css/styles.css             mobile-first shell
-js/main.js                 boot, screen routing, settings, install prompt
-js/game.js                 loop, state machine, spawning, collisions, rendering
-js/player.js               ship movement, weapons, pickups, death
-js/enemies.js              chickens, asteroids, UFOs, bosses
-js/waves.js                formations, wave archetypes, difficulty curve
-js/weapons.js              weapon table + projectile rendering
-js/effects.js              pooled particles, shockwaves, floating text
-js/hud.js                  in-canvas HUD, boss bar, banners
-js/art.js                  procedural sprite pre-rendering + starfield
-js/audio.js                Web Audio sound effects and music
-js/input.js                touch / mouse / keyboard / gamepad
-js/storage.js              settings + high scores
-js/util.js                 math, pooling, formatting
-sw.js                      offline cache
-tools/make-icons.mjs       regenerates icons/ (dependency-free PNG encoder)
+public/                    the deployable site — nothing else is uploaded
+  index.html               landing page + overlays (menu, how-to, scores, settings, pause, results)
+  404.html                 branded not-found page
+  _headers                 Cloudflare security + cache headers
+  manifest.webmanifest     PWA manifest
+  sw.js                    offline cache
+  css/styles.css           mobile-first shell
+  icons/                   generated PNG icon set
+  js/main.js               boot, screen routing, settings, install prompt
+  js/game.js               loop, state machine, spawning, collisions, rendering
+  js/player.js             ship movement, weapons, pickups, death
+  js/enemies.js            chickens, asteroids, UFOs, bosses
+  js/waves.js              formations, wave archetypes, difficulty curve
+  js/weapons.js            weapon table + projectile rendering
+  js/effects.js            pooled particles, shockwaves, floating text
+  js/hud.js                in-canvas HUD, boss bar, banners
+  js/art.js                procedural sprite pre-rendering + starfield
+  js/audio.js              Web Audio sound effects and music
+  js/input.js              touch / mouse / keyboard / gamepad
+  js/storage.js            settings + high scores
+  js/util.js               math, pooling, formatting
+wrangler.jsonc             Cloudflare deploy config
+tools/make-icons.mjs       regenerates public/icons (dependency-free PNG encoder)
 ```
 
 Regenerate the icon set after changing the artwork:
 
 ```bash
-node tools/make-icons.mjs
+npm run icons
 ```
 
 ## Notes

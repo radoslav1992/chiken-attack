@@ -1,0 +1,19 @@
+{
+  "name": "chicken-attack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile-first PWA arcade shooter: waves of invading space chickens, nine weapons, boss hens.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "serve": "python3 -m http.server 8000 --directory public",
+    "deploy": "wrangler deploy",
+    "deploy:pages": "wrangler pages deploy public --project-name chicken-attack",
+    "tail": "wrangler tail",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.115.0"
+  }
+}

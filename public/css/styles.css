@@ -61,6 +61,59 @@ body {
   pointer-events: none;
 }
 
+/* ------------------------------------------------------------------ 404 page */
+
+.page-404 {
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 24px);
+  background: radial-gradient(120% 90% at 50% 0%, #131a3a, #05060f 70%);
+}
+
+.notfound {
+  max-width: 420px;
+  text-align: center;
+}
+
+.notfound-code {
+  margin: 0;
+  font-size: clamp(64px, 22vw, 108px);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(180deg, #fff 10%, #ffe066 55%, #ff9f43 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.notfound-title {
+  margin: 6px 0 10px;
+  font-size: clamp(22px, 6vw, 30px);
+  letter-spacing: 0.02em;
+}
+
+.notfound-text {
+  margin: 0 0 24px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.notfound-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* Kept in the stylesheet rather than a style attribute so the deployed
+   Content-Security-Policy can forbid inline styles. */
+.noscript-note {
+  position: relative;
+  z-index: 1;
+  padding: 24px;
+  font-size: 16px;
+  color: var(--ink);
+}
+
 /* ------------------------------------------------------------------ screens */
 
 .screen {

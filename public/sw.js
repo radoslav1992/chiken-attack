@@ -4,10 +4,17 @@
  * cache-first with a background refresh.
  */
 
-const VERSION = 'chicken-attack-v1';
+const VERSION = 'chicken-attack-v2';
+
+/*
+ * './' is the canonical app shell URL. Hosts that normalise /index.html to /
+ * (Cloudflare's `html_handling`, for one) answer a request for 'index.html'
+ * with a redirect, so it is never precached or matched by name.
+ */
+const SHELL = './';
+
 const ASSETS = [
-  './',
-  'index.html',
+  SHELL,
   'manifest.webmanifest',
   'css/styles.css',
   'js/main.js',
@@ -54,15 +61,24 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigations: serve the shell so deep links and offline launches work.
+  // Navigations: keep the shell fresh online, fall back to it offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          caches.open(VERSION).then((c) => c.put('index.html', res.clone()));
+          if (res.ok && !res.redirected) {
+            const copy = res.clone();
+            caches.open(VERSION).then((c) => c.put(SHELL, copy));
+          }
           return res;
         })
-        .catch(() => caches.match('index.html').then((r) => r || caches.match('./')))
+        .catch(async () => {
+          const root = new URL(SHELL, self.registration.scope);
+          // A cached shell only works at the scope root — its stylesheet and
+          // module URLs are relative. Deep links bounce there instead.
+          if (url.pathname !== root.pathname) return Response.redirect(root.href, 302);
+          return (await caches.match(SHELL)) || Response.error();
+        })
     );
     return;
   }
