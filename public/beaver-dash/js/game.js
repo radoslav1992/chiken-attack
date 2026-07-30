@@ -85,10 +85,21 @@ const AIRTIME = 0.694; // full held jump, apex hang included — used to size ga
 const BASE_MPS = 7.2;
 const MAX_MPS_MUL = 2.55;
 
-const ACORN_POINTS = 25;
-const GOLDEN_POINTS = 250;
-const SMASH_POINTS = 75;
-const NEAR_MISS_POINTS = 30;
+/* --- Score economy --------------------------------------------------------
+ * Distance is the backbone; everything else is a bonus on top of it. That
+ * needs stating because it is easy to break: when acorns became genuinely
+ * collectable, a 700 m run went from 3,056 points to 42,450 and pickups became
+ * 97% of the total — the board was no longer ranking how far anyone ran.
+ *
+ * A run meets roughly 20 acorns per 100 m, so at 5 points each and a
+ * multiplier up to x5 they contribute about a third of a good run's score
+ * while a metre is worth ten. Retune these together, not one at a time.
+ */
+const DIST_POINTS = 10; // per metre
+const ACORN_POINTS = 5; // x1 to x5 by combo
+const GOLDEN_POINTS = 150;
+const SMASH_POINTS = 150;
+const NEAR_MISS_POINTS = 60;
 const COMBO_STEP = 5; // acorns per multiplier step
 const COMBO_MAX = 5;
 const COMBO_HOLD = 2.4; // seconds before the chain lapses
@@ -233,35 +244,41 @@ function runLine(a, b, n, y = RUN_Y) {
  *      to land on.
  * `len` is the pattern's own length in metres; the spawner adds the rest gap.
  */
+/* A chain earns its place by teaching the line through a pattern, so they sit
+ * on the patterns where the path is worth showing — the first encounter with a
+ * verb, and the double-jump arc over a dam, which is genuinely hard to picture.
+ * The rhythm patterns (a row of identical stumps, a pair of rocks a jump apart)
+ * go without: their line is obvious, and chaining every one of them buried the
+ * score under pickups at one acorn every two metres. */
 const PATTERNS = [
   /* tier 0 — one verb at a time */
-  { id: 'hop', tier: 0, len: 1, build: (c) => [item('stump', 0, { h: rand(1, 0.72) }), ...arc(c, 0.4)] },
-  { id: 'rock', tier: 0, len: 1.5, build: (c) => [item('rock', 0), ...arc(c, 0.6)] },
-  { id: 'coast', tier: 0, len: 3, build: (c) => runLine(0, 3, 5) },
-  { id: 'twoHop', tier: 0, len: 6, build: (c) => [item('stump', 0, { h: 0.8 }), item('stump', c.span * SEPARATE, { h: 0.8 }), ...arc(c, 0.4), ...arc(c, c.span * SEPARATE + 0.4)] },
-  { id: 'hopPair', tier: 0, len: 3, build: (c) => { const at2 = c.span * TOGETHER; return [item('stump', 0, { h: 0.78 }), item('stump', at2, { h: 0.78 }), ...arc(c, at2 / 2 + 0.4, { n: 7 })]; } },
+  { id: 'hop', tier: 0, len: 1, build: (c) => [item('stump', 0, { h: rand(1, 0.72) }), ...arc(c, 0.4, { n: 5 })] },
+  { id: 'rock', tier: 0, len: 1.5, build: (c) => [item('rock', 0), ...arc(c, 0.6, { n: 5 })] },
+  { id: 'coast', tier: 0, len: 3, build: (c) => runLine(0, 3, 4) },
+  { id: 'twoHop', tier: 0, len: 6, build: (c) => [item('stump', 0, { h: 0.8 }), item('stump', c.span * SEPARATE, { h: 0.8 })] },
+  { id: 'hopPair', tier: 0, len: 3, build: (c) => { const at2 = c.span * TOGETHER; return [item('stump', 0, { h: 0.78 }), item('stump', at2, { h: 0.78 }), ...arc(c, at2 / 2 + 0.4, { n: 6 })]; } },
 
   /* tier 1 — the other verbs arrive */
-  { id: 'logs', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.42, 0.3); return [item('logs', 0, { w }), ...arc(c, w / 2)]; } },
-  { id: 'heron', tier: 1, len: 2, build: (c) => [item('heron', 0), ...runLine(-1.4, 2.8, 4, 0.7)] },
-  { id: 'gap', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.4, 0.34); return [item('gap', 0, { w }), ...arc(c, w / 2)]; } },
-  { id: 'rockPair', tier: 1, len: 6, build: (c) => [item('rock', 0), item('rock', c.span * SEPARATE), ...arc(c, 0.6)] },
-  { id: 'acornArc', tier: 1, len: 3, build: (c) => [item('stump', 0, { h: 0.9 }), ...arc(c, 0.4, { n: 9 })] },
+  { id: 'logs', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.42, 0.3); return [item('logs', 0, { w }), ...arc(c, w / 2, { n: 5 })]; } },
+  { id: 'heron', tier: 1, len: 2, build: (c) => [item('heron', 0), ...runLine(-1.4, 2.8, 3, 0.7)] },
+  { id: 'gap', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.4, 0.34); return [item('gap', 0, { w }), ...arc(c, w / 2, { n: 5 })]; } },
+  { id: 'rockPair', tier: 1, len: 6, build: (c) => [item('rock', 0), item('rock', c.span * SEPARATE)] },
+  { id: 'acornArc', tier: 1, len: 3, build: (c) => [item('stump', 0, { h: 0.9 }), ...arc(c, 0.4, { n: 7 })] },
 
   /* tier 2 — two verbs in sequence, with a landing strip between */
-  { id: 'dam', tier: 2, len: 2, build: (c) => [item('dam', 0, { h: rand(3.9, 3.55) }), ...arc(c, 0.55, { double: true, n: 8 })] },
-  { id: 'gapStump', tier: 2, len: 7, build: (c) => { const w = c.span * 0.36; return [item('gap', 0, { w }), item('stump', c.span * SEPARATE + w, { h: 0.85 }), ...arc(c, w / 2)]; } },
+  { id: 'dam', tier: 2, len: 2, build: (c) => [item('dam', 0, { h: rand(3.9, 3.55) }), ...arc(c, 0.55, { double: true, n: 6 })] },
+  { id: 'gapStump', tier: 2, len: 7, build: (c) => { const w = c.span * 0.36; return [item('gap', 0, { w }), item('stump', c.span * SEPARATE + w, { h: 0.85 }), ...arc(c, w / 2, { n: 5 })]; } },
   { id: 'heronStump', tier: 2, len: 5, build: (c) => [item('heron', 0), item('stump', c.span * 0.95, { h: 0.85 }), ...runLine(-1.2, 2.4, 3, 0.7)] },
-  { id: 'logsRock', tier: 2, len: 7, build: (c) => { const w = c.span * 0.32; return [item('logs', 0, { w }), item('rock', c.span * SEPARATE + w), ...arc(c, w / 2)]; } },
-  { id: 'tripleHop', tier: 2, len: 8, build: (c) => [item('stump', 0, { h: 0.75 }), item('stump', c.span * SEPARATE, { h: 0.75 }), item('stump', c.span * SEPARATE * 2, { h: 0.75 }), ...arc(c, 0.4)] },
-  { id: 'wideLogs', tier: 2, len: 4, build: (c) => { const w = c.span * 0.46; return [item('logs', 0, { w }), ...arc(c, w / 2, { n: 8 })]; } },
+  { id: 'logsRock', tier: 2, len: 7, build: (c) => { const w = c.span * 0.32; return [item('logs', 0, { w }), item('rock', c.span * SEPARATE + w)]; } },
+  { id: 'tripleHop', tier: 2, len: 8, build: (c) => [item('stump', 0, { h: 0.75 }), item('stump', c.span * SEPARATE, { h: 0.75 }), item('stump', c.span * SEPARATE * 2, { h: 0.75 })] },
+  { id: 'wideLogs', tier: 2, len: 4, build: (c) => { const w = c.span * 0.46; return [item('logs', 0, { w }), ...arc(c, w / 2, { n: 5 })]; } },
 
   /* tier 3 — the demanding end */
-  { id: 'gapGap', tier: 3, len: 9, build: (c) => { const a = c.span * 0.38, b = c.span * 0.36, at2 = c.span * SEPARATE + a; return [item('gap', 0, { w: a }), item('gap', at2, { w: b }), ...arc(c, a / 2), ...arc(c, at2 + b / 2)]; } },
-  { id: 'gapDam', tier: 3, len: 10, build: (c) => { const w = c.span * 0.34, at2 = c.span * SEPARATE + w; return [item('gap', 0, { w }), item('dam', at2, { h: 3.7 }), ...arc(c, at2 + 0.55, { double: true, n: 8 })]; } },
-  { id: 'damLogs', tier: 3, len: 9, build: (c) => [item('dam', 0, { h: 3.6 }), item('logs', c.span * AFTER_DAM, { w: c.span * 0.3 }), ...arc(c, 0.55, { double: true, n: 8 })] },
-  { id: 'heronPair', tier: 3, len: 6, build: (c) => [item('heron', 0), item('heron', c.span * 0.85), ...runLine(-1.2, c.span * 1.4, 6, 0.7)] },
-  { id: 'logsHeron', tier: 3, len: 7, build: (c) => { const w = c.span * 0.3; return [item('logs', 0, { w }), item('heron', w + c.span * 1.15), ...arc(c, w / 2)]; } },
+  { id: 'gapGap', tier: 3, len: 9, build: (c) => { const a = c.span * 0.38, b = c.span * 0.36, at2 = c.span * SEPARATE + a; return [item('gap', 0, { w: a }), item('gap', at2, { w: b }), ...arc(c, a / 2, { n: 5 })]; } },
+  { id: 'gapDam', tier: 3, len: 10, build: (c) => { const w = c.span * 0.34, at2 = c.span * SEPARATE + w; return [item('gap', 0, { w }), item('dam', at2, { h: 3.7 }), ...arc(c, at2 + 0.55, { double: true, n: 6 })]; } },
+  { id: 'damLogs', tier: 3, len: 9, build: (c) => [item('dam', 0, { h: 3.6 }), item('logs', c.span * AFTER_DAM, { w: c.span * 0.3 })] },
+  { id: 'heronPair', tier: 3, len: 6, build: (c) => [item('heron', 0), item('heron', c.span * 0.85), ...runLine(-1.2, c.span * 1.4, 4, 0.7)] },
+  { id: 'logsHeron', tier: 3, len: 7, build: (c) => { const w = c.span * 0.3; return [item('logs', 0, { w }), item('heron', w + c.span * 1.15)]; } },
 ];
 
 const FERN_CYCLE = 30; // metres before the undergrowth repeats
@@ -839,7 +856,7 @@ export class Game {
 
   scoreNow() {
     this.score =
-      Math.floor(this.distance) +
+      Math.floor(this.distance * DIST_POINTS) +
       this.acornPoints +
       this.goldenTaken * GOLDEN_POINTS +
       this.smashes * SMASH_POINTS +

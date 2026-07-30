@@ -150,10 +150,18 @@ One button, five verbs. Each obstacle is built to demand exactly one of them:
 | Dam | the double jump | 3.55–4.05 m, above a single jump's 3.23 m apex |
 | Heron | nothing at all | flies at 1.35 m, which even a tap clips |
 
-A third press in the air is a tail-slam that smashes stumps and rocks (+75) but spends the rest of
+A third press in the air is a tail-slam that smashes stumps and rocks (+150) but spends the rest of
 your descent, so diving early leaves you grounded with nothing left for what follows. Acorns build
 a multiplier to ×5, clearing something by under 0.42 m pays a near-miss bonus, and a rare fern
 shield absorbs one hit.
+
+**Distance is the backbone of the score and the constants are tuned together.** A metre is worth 10,
+an acorn 5 (×1 to ×5 by combo), and a run meets about 20 acorns per 100 m — so pickups come to
+roughly a third of a good run and distance carries the rest. This is easy to break: when acorns
+first became genuinely collectable, a 700 m run went from 3,056 points to 42,450 and pickups became
+97% of the total, at which point the board was no longer ranking how far anyone had run. Change
+`DIST_POINTS`, `ACORN_POINTS` and the chain density as one decision, and check the result — the
+`economy` harness measures acorns per 100 m and the resulting share directly.
 
 **Acorn chains are generated from the physics, not drawn by hand.** `jumpPath()` runs the same
 integrator the beaver uses and `arc()` samples it, so a chain lies exactly on the path a jump
