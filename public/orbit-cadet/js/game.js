@@ -13,7 +13,7 @@
  */
 
 import { stepBall, stepFlipper, makeBall, BALL_R, SURF } from './physics.js';
-import { buildTable, RANKS, TABLE_W, TABLE_H } from './table.js';
+import { buildTable, BOUNDARY, RANKS, TABLE_W, TABLE_H } from './table.js';
 import { sfx } from './audio.js';
 
 const TAU = Math.PI * 2;
@@ -21,22 +21,30 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a = 1, b = 0) => b + Math.random() * (a - b);
 
+/* The palette is the original's: a deep navy playfield printed with cyan line
+ * art, chrome rails, and amber/green inserts. The first pass was purple felt
+ * with teal decals, which read as a generic neon table rather than the
+ * blue-and-steel space cabinet this is meant to be. */
 const C = {
-  ink: '#f6efe3',
-  dim: '#9a92b8',
-  amber: '#ffb43d',
+  deep: '#05091d', // the letterbox and the darkest felt
+  felt: '#0c1740',
+  feltLit: '#17275f',
+  line: '#7fc9ff', // the cyan everything is printed in
+  ink: '#eaf3ff',
+  dim: '#8fa3cc',
+  amber: '#ffc24a',
   red: '#ff5240',
-  teal: '#43e0c0',
-  purple: '#7b5cff',
-  felt: '#171432',
-  feltLit: '#221d45',
-  rail: '#3b3560',
-  metal: '#8f88ad',
-  metalLit: '#c9c2e0',
-  rubber: '#ff5240',
-  ball: '#dfe3f2',
-  lampOff: '#2b2646',
+  green: '#4ef0a0',
+  chrome: '#ccd9ee',
+  chromeMid: '#7b8cad',
+  chromeDark: '#232c4a',
+  rubber: '#e0483a',
+  ball: '#e8edf8',
+  lampOff: '#16203f',
 };
+
+/* Three bumper caps, so the cluster reads as three things rather than one. */
+const BUMPER_CAP = [['#ffd88a', '#c8631d'], ['#a8e8ff', '#1f6ea8'], ['#ffb3a8', '#a83224']];
 
 const BALLS_PER_GAME = 3;
 const TILT_LIMIT = 3; // nudges banked before the table tilts
@@ -50,6 +58,8 @@ const PTS = {
   target: 1200,
   bankClear: 6000,
   spinner: 260,
+  fuel: 350,
+  fuelBank: 4000,
   orbit: 5200,
   inlane: 400,
   selector: 800,
@@ -112,7 +122,7 @@ export class Game {
     this.offY = (this.h - TABLE_H * this.scale) / 2;
     const wasWide = this.wide;
     this.wide = this.offX > 70; // room beside the table for the backglass
-    this._grad = null;
+    this.bakeArt();
     /* Tell the shell which of the two score displays should be showing. With the
      * backglass drawn there is no reason for the DOM HUD to repeat it, and in
      * landscape the two overlapped and printed the score twice. */
@@ -157,6 +167,8 @@ export class Game {
     this.orbits = 0;
     this.lampT = {};
     this.multiball = false;
+    this.fuel = [false, false, false];
+    this.bonusX = 1;
   }
 
   newBall() {
@@ -164,6 +176,7 @@ export class Game {
     this.balls = [makeBall(s.x, s.y, 0, 0)];
     this.plunger = 0;
     this.inLane = true;
+    this.laneArmed = false;
     this.tilted = false;
     this.nudgeBank = 0;
   }
@@ -272,13 +285,28 @@ export class Game {
       stepBall(b, dt, world);
       this.checkSensors(b, dt);
 
-      // Back down the plunger lane is a re-launch, not a loss.
-      if (b.x > table.laneX0 && b.y > 930 && Math.abs(b.vy) < 220 && this.balls.length === 1) {
+      /* Back down the plunger lane is a re-launch, not a loss — and at ANY speed.
+       * Requiring |vy| < 220 meant a ball returning from the dome, which arrives
+       * fast, sailed past the check and out of the bottom of the lane as a lost
+       * ball. That is a large part of why balls seemed to vanish down the right
+       * without the player getting a shot.
+       *
+       * Armed only once the ball has climbed out of the lane, because it starts
+       * inside this region and an unarmed check fires on the launch frame. A
+       * `vy > 0` test looks like it does the same job and does not: a weak plunge
+       * that dribbles back settles on the lane floor at a few units per second of
+       * float, never registers a downward frame, and sits there for the rest of
+       * the game with the plunger disarmed. */
+      if (b.y < 900) this.laneArmed = true;
+      if (this.laneArmed && b.x > table.laneX0 && b.y > 930 && this.balls.length === 1) {
         this.inLane = true;
+        this.laneArmed = false;
         this.plunger = 0;
+        continue;
       }
 
-      if (b.y > table.drainY) {
+      // Only the playfield drains; the lane is handled above.
+      if (b.y > table.drainY && b.x < table.laneX0) {
         this.balls.splice(i, 1);
         this.onDrain();
       }
@@ -306,7 +334,7 @@ export class Game {
       this.add(PTS.target);
       this.lamp(`target${o.target}`, 4);
       sfx.target(o.target);
-      this.pop(o.x1 + 20, o.y1 + 12, `${PTS.target}`, C.teal);
+      this.pop(o.x1 + 20, o.y1 + 12, `${PTS.target}`, C.line);
       if (this.mission?.id === 'targets') this.progress();
       if (this.table.targets.every((t) => t.off)) {
         this.add(PTS.bankClear);
@@ -360,11 +388,42 @@ export class Game {
       case 'inlaneL':
       case 'inlaneR':
         this.add(PTS.inlane);
+        this.lamp(s.id === 'inlaneL' ? 'inlaneL' : 'inlaneR', 0.5);
+        break;
+      case 'fuel0':
+      case 'fuel1':
+      case 'fuel2':
+        this.onFuel(s.fuel);
         break;
       default:
         break;
     }
     void b;
+  }
+
+  /* The three lanes across the top of the dome. Light all three and the bonus
+   * multiplier steps up — which is the reward for a hard plunge, since every
+   * launch runs through the top channel and a fast one crosses all three. */
+  onFuel(i) {
+    this.lamp(`fuel${i}`, 0.6);
+    if (this.fuel[i]) {
+      this.add(PTS.fuel);
+      return;
+    }
+    this.fuel[i] = true;
+    this.add(PTS.fuel);
+    sfx.target(i);
+    if (!this.fuel.every(Boolean)) return;
+    this.fuel = [false, false, false];
+    this.add(PTS.fuelBank);
+    if (this.bonusX < 5) {
+      this.bonusX++;
+      this.say(`BONUS X${this.bonusX}`, 1.8);
+      sfx.bankClear();
+    } else {
+      this.say('FUEL FULL', 1.4);
+      sfx.bankClear();
+    }
   }
 
   armMission() {
@@ -386,7 +445,7 @@ export class Game {
     this.add(award);
     this.missionsDone++;
     this.say('MISSION COMPLETE', 2.4);
-    this.pop(TABLE_W / 2, 560, `${award}`, C.teal, 1.4);
+    this.pop(TABLE_W / 2, 470, `${award}`, C.green, 1.4);
     sfx.missionDone();
     this.mission = null;
     this.emit('mission', null);
@@ -454,7 +513,7 @@ export class Game {
   }
 
   add(n) {
-    this.score += n;
+    this.score += Math.round(n * this.bonusX);
   }
 
   /* ----------------------------------------------------------------- input -- */
@@ -478,7 +537,13 @@ export class Game {
     const b = this.balls[0];
     if (!b) return;
     this.inLane = false;
-    b.vy = -(760 + 1500 * power);
+    /* The floor here matters. Clearing the lane's inner wall needs ~1470 units/s;
+     * at the old base of 760 anything under about half charge could not reach the
+     * playfield at all and simply rolled back down for a re-plunge. Measured, 57%
+     * of launches never entered play — which is precisely the "ball falls to the
+     * right without me playing" complaint. Every launch now clears; power decides
+     * how far round the dome it carries, which is what a plunger should control. */
+    b.vy = -(1700 + 900 * power);
     b.vx = -10;
     sfx.plunge(power);
     this.plunger = 0;
@@ -567,11 +632,267 @@ export class Game {
     }
   }
 
-  /* ---------------------------------------------------------------- render -- */
+  /* ---------------------------------------------------------------- render --
+   * Two layers. Everything that never changes — felt, starfield, line art,
+   * decals, rails — is baked once into an offscreen canvas at the current pixel
+   * density and blitted with a single drawImage. Only the parts that actually
+   * animate are drawn per frame. That is what pays for artwork this dense: the
+   * bake is a few hundred operations run once per resize instead of once per
+   * frame at 120 Hz.
+   */
+
+  /** Rebuild the static layer. Called from resize(), never from the loop. */
+  bakeArt() {
+    const px = clamp(this.scale * clamp(window.devicePixelRatio || 1, 1, 2), 0.4, 3);
+    const cv = this._art || (this._art = document.createElement('canvas'));
+    cv.width = Math.max(1, Math.round(TABLE_W * px));
+    cv.height = Math.max(1, Math.round(TABLE_H * px));
+    const g = cv.getContext('2d');
+    g.setTransform(px, 0, 0, px, 0, 0);
+    g.clearRect(0, 0, TABLE_W, TABLE_H);
+
+    this.bakeFelt(g);
+    this.bakeRings(g);
+    this.bakePanels(g);
+    this.bakeLanes(g);
+    this.bakeArrows(g);
+    this.bakeApron(g);
+    this.bakeLabels(g);
+    /* Everything above is printed on the playfield, so it must stop at the
+     * playfield's edge. Painting the outside AFTER the decals, rather than
+     * clipping each one, keeps every draw call above free of geometry it should
+     * not have to know about. The rails go on top, since a rail straddles the
+     * edge by design. */
+    this.maskOutside(g);
+    this.bakeRails(g);
+    this._artPx = px;
+  }
+
+  /** Paint over everything outside the table, so the felt has the table's shape. */
+  maskOutside(g) {
+    g.beginPath();
+    g.rect(0, 0, TABLE_W, TABLE_H);
+    g.moveTo(BOUNDARY[0][0], BOUNDARY[0][1]);
+    for (const p of BOUNDARY.slice(1)) g.lineTo(p[0], p[1]);
+    g.closePath();
+    const grad = g.createLinearGradient(0, 0, 0, TABLE_H);
+    grad.addColorStop(0, '#0a1024');
+    grad.addColorStop(1, '#05080f');
+    g.fillStyle = grad;
+    g.fill('evenodd');
+  }
+
+  bakeFelt(g) {
+    const grad = g.createRadialGradient(TABLE_W / 2, 330, 40, TABLE_W / 2, 580, 780);
+    grad.addColorStop(0, C.feltLit);
+    grad.addColorStop(0.55, C.felt);
+    grad.addColorStop(1, C.deep);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, TABLE_W, TABLE_H);
+
+    /* A starfield, because the table is called Orbit Cadet and the original's
+     * playfield is space. Deterministic: the same stars every load, so it reads
+     * as printed artwork rather than noise. */
+    let seed = 20260730;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 320; i++) {
+      const x = rnd() * TABLE_W;
+      const y = rnd() * TABLE_H;
+      const r = 0.4 + rnd() * 1.5;
+      const a = 0.1 + rnd() * 0.55;
+      g.globalAlpha = a;
+      g.fillStyle = rnd() > 0.86 ? C.line : '#ffffff';
+      g.beginPath();
+      g.arc(x, y, r, 0, TAU);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+
+    // A nebula wash behind the bumper cluster.
+    const neb = g.createRadialGradient(280, 414, 10, 280, 414, 210);
+    neb.addColorStop(0, 'rgba(80,150,255,0.16)');
+    neb.addColorStop(0.6, 'rgba(123,92,255,0.07)');
+    neb.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = neb;
+    g.fillRect(70, 204, 420, 420);
+  }
+
+  bakeRings(g) {
+    const rings = this.table.decor.rings;
+    for (let i = 0; i < rings.length; i++) {
+      const r = rings[i];
+      g.strokeStyle = i === rings.length - 1 ? 'rgba(127,201,255,0.55)' : 'rgba(127,201,255,0.28)';
+      g.lineWidth = i === rings.length - 1 ? 2.5 : 1.5;
+      g.setLineDash(i % 2 ? [10, 8] : []);
+      g.beginPath();
+      g.arc(r.x, r.y, r.r, 0, TAU);
+      g.stroke();
+    }
+    g.setLineDash([]);
+    // Tick marks round the outermost ring, like a range scale.
+    const outer = rings[0];
+    g.strokeStyle = 'rgba(127,201,255,0.34)';
+    g.lineWidth = 2;
+    for (let a = 0; a < TAU; a += TAU / 24) {
+      g.beginPath();
+      g.moveTo(outer.x + Math.cos(a) * (outer.r - 7), outer.y + Math.sin(a) * (outer.r - 7));
+      g.lineTo(outer.x + Math.cos(a) * outer.r, outer.y + Math.sin(a) * outer.r);
+      g.stroke();
+    }
+  }
+
+  bakePanels(g) {
+    for (const p of this.table.decor.panels) {
+      g.beginPath();
+      g.moveTo(p.pts[0][0], p.pts[0][1]);
+      for (const q of p.pts.slice(1)) g.lineTo(q[0], q[1]);
+      g.closePath();
+      g.fillStyle = 'rgba(12,23,64,0.5)';
+      g.fill();
+      g.strokeStyle = p.color;
+      g.lineWidth = 2;
+      g.stroke();
+    }
+  }
+
+  /** Lane floors: a lighter channel with a hairline either side. */
+  bakeLanes(g) {
+    for (const lane of this.table.decor.lanes) {
+      const trace = () => {
+        g.beginPath();
+        g.moveTo(lane.path[0][0], lane.path[0][1]);
+        for (const p of lane.path.slice(1)) g.lineTo(p[0], p[1]);
+      };
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      trace();
+      g.strokeStyle = 'rgba(127,201,255,0.09)';
+      g.lineWidth = lane.w;
+      g.stroke();
+      trace();
+      g.strokeStyle = 'rgba(127,201,255,0.16)';
+      g.lineWidth = lane.w - 5;
+      g.stroke();
+      trace();
+      g.strokeStyle = 'rgba(12,23,64,0.55)';
+      g.lineWidth = lane.w - 11;
+      g.stroke();
+    }
+  }
+
+  bakeArrows(g) {
+    for (const a of this.table.decor.arrows) {
+      g.save();
+      g.translate(a.x, a.y);
+      g.rotate(a.rot);
+      g.strokeStyle = 'rgba(127,201,255,0.5)';
+      g.lineWidth = 3;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (let i = 0; i < a.n; i++) {
+        const d = i * 15;
+        g.beginPath();
+        g.moveTo(d - 10, 11);
+        g.lineTo(d, 0);
+        g.lineTo(d + 10, 11);
+        g.stroke();
+      }
+      g.restore();
+    }
+  }
+
+  bakeLabels(g) {
+    for (const l of this.table.decor.labels) {
+      g.save();
+      g.translate(l.x, l.y);
+      if (l.rot) g.rotate(l.rot);
+      g.fillStyle = l.color;
+      g.font = `700 ${l.size}px ui-rounded, "Trebuchet MS", system-ui, sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      tracked(g, l.text, 0, 0, l.track || 0);
+      g.restore();
+    }
+    g.textBaseline = 'alphabetic';
+  }
+
+  /** The rails: chrome, which is three strokes — shadow, body, highlight. */
+  bakeRails(g) {
+    for (const o of this.table.solids) {
+      if (o.kind !== 'seg' || o.target !== undefined || o.sling) continue;
+      const wide = o.surf === 'metal' ? 9 : 10;
+      g.lineCap = 'round';
+      g.strokeStyle = 'rgba(3,6,20,0.75)';
+      g.lineWidth = wide + 4;
+      line(g, o.x1, o.y1 + 3, o.x2, o.y2 + 3);
+      const grad = g.createLinearGradient(o.x1, o.y1 - wide, o.x1, o.y1 + wide);
+      grad.addColorStop(0, o.surf === 'metal' ? C.chrome : '#5b6b91');
+      grad.addColorStop(0.5, o.surf === 'metal' ? C.chromeMid : '#3b4770');
+      grad.addColorStop(1, C.chromeDark);
+      g.strokeStyle = grad;
+      g.lineWidth = wide;
+      line(g, o.x1, o.y1, o.x2, o.y2);
+      g.strokeStyle = 'rgba(255,255,255,0.42)';
+      g.lineWidth = 2;
+      line(g, o.x1, o.y1 - wide * 0.3, o.x2, o.y2 - wide * 0.3);
+    }
+    // Solid posts are static too.
+    for (const o of this.table.solids) {
+      if (o.kind !== 'circle' || o.bumper !== undefined) continue;
+      const grad = g.createRadialGradient(o.cx - o.r * 0.35, o.cy - o.r * 0.45, 1, o.cx, o.cy, o.r);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.45, C.chrome);
+      grad.addColorStop(1, C.chromeDark);
+      g.fillStyle = grad;
+      g.beginPath();
+      g.arc(o.cx, o.cy, o.r, 0, TAU);
+      g.fill();
+      g.strokeStyle = 'rgba(3,6,20,0.8)';
+      g.lineWidth = 2;
+      g.stroke();
+    }
+  }
+
+  /** The dead wedge beside the plunger lane, and the drain mouth's decal.
+   *
+   * There is no apron on the left: the left funnel wall runs straight from the
+   * flipper to the drain lip, so outside it is outside the table. The right side
+   * has a real sealed wedge between the funnel and the lane, and left as felt it
+   * read as playfield the ball was mysteriously never in. */
+  bakeApron(g) {
+    const wedge = [[400, 874], [328, 1000], [498, 1000], [498, 770], [450, 856]];
+    g.beginPath();
+    g.moveTo(wedge[0][0], wedge[0][1]);
+    for (const p of wedge.slice(1)) g.lineTo(p[0], p[1]);
+    g.closePath();
+    const grad = g.createLinearGradient(0, 770, 0, 1000);
+    grad.addColorStop(0, '#111a38');
+    grad.addColorStop(1, '#070c1e');
+    g.fillStyle = grad;
+    g.fill();
+
+    g.fillStyle = 'rgba(255,82,64,0.85)';
+    g.font = '700 12px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
+    g.textAlign = 'center';
+    tracked(g, 'DRAIN', TABLE_W / 2, 964, 4);
+    // Two chevrons pointing into the mouth, so it reads as the way out.
+    g.strokeStyle = 'rgba(255,82,64,0.45)';
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    for (let i = 0; i < 2; i++) {
+      const y = 976 + i * 12;
+      g.beginPath();
+      g.moveTo(TABLE_W / 2 - 12, y);
+      g.lineTo(TABLE_W / 2, y + 8);
+      g.lineTo(TABLE_W / 2 + 12, y);
+      g.stroke();
+    }
+  }
 
   render() {
     const ctx = this.ctx;
-    ctx.fillStyle = '#0b0913';
+    ctx.fillStyle = C.deep;
     ctx.fillRect(0, 0, this.w, this.h);
 
     if (this.wide) this.drawBackglass(ctx);
@@ -581,11 +902,12 @@ export class Game {
     ctx.translate(this.offX, this.offY);
     ctx.scale(this.scale, this.scale);
 
-    this.drawPlayfield(ctx);
-    this.drawLanes(ctx);
+    if (this._art) ctx.drawImage(this._art, 0, 0, TABLE_W, TABLE_H);
+
+    this.drawInserts(ctx);
+    this.drawTargets(ctx);
     this.drawSlings(ctx);
-    this.drawSolids(ctx);
-    this.drawLamps(ctx);
+    this.drawBumpers(ctx);
     this.drawFlippers(ctx);
     this.drawPlunger(ctx);
     this.drawBalls(ctx);
@@ -604,252 +926,221 @@ export class Game {
       ctx.globalAlpha = 1;
     }
     if (this.state === 'paused') {
-      ctx.fillStyle = 'rgba(11,9,19,0.6)';
+      ctx.fillStyle = 'rgba(5,9,29,0.6)';
       ctx.fillRect(0, 0, this.w, this.h);
     }
   }
 
-  drawPlayfield(ctx) {
-    if (!this._grad) {
-      const g = ctx.createRadialGradient(TABLE_W / 2, 380, 60, TABLE_W / 2, 500, 720);
-      g.addColorStop(0, C.feltLit);
-      g.addColorStop(1, C.felt);
-      this._grad = g;
-    }
-    ctx.fillStyle = this._grad;
-    ctx.fillRect(0, 0, TABLE_W, TABLE_H);
+  /* --- inserts: the lit lamps flush in the playfield --- */
 
-    // Faint concentric arcs, the sort of decal a real playfield carries.
-    ctx.strokeStyle = 'rgba(123,92,255,0.10)';
-    ctx.lineWidth = 2;
-    for (let r = 120; r < 620; r += 70) {
-      ctx.beginPath();
-      ctx.arc(TABLE_W / 2, 300, r, 0.15, Math.PI - 0.15);
-      ctx.stroke();
-    }
-    // Mission name across the middle of the playfield, as table art.
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = 'rgba(67,224,192,0.25)';
-    ctx.font = '700 34px ui-rounded, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('ORBIT CADET', TABLE_W / 2, 700);
-    ctx.restore();
-  }
-
-  /** The lane floors, drawn as slightly lighter channels so the shots read. */
-  drawLanes(ctx) {
-    ctx.strokeStyle = 'rgba(246,239,227,0.05)';
-    ctx.lineWidth = 44;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(48, 640);
-    ctx.quadraticCurveTo(52, 380, 120, 240);
-    ctx.quadraticCurveTo(180, 150, 268, 130);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(519, 900);
-    ctx.lineTo(519, 320);
-    ctx.stroke();
-  }
-
-  /* The triangular plate each slingshot's rubber is stretched over. Drawn
-   * first, so the rubber sits on top of it. */
-  drawSlings(ctx) {
-    for (const pts of this.table.slingPlates || []) {
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]);
-      ctx.closePath();
-      ctx.fillStyle = '#2a2450';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(11,9,19,0.6)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-  }
-
-  drawSolids(ctx) {
-    for (const o of this.table.solids) {
-      if (o.off) {
-        // A dropped target leaves its slot visible.
-        if (o.target !== undefined) {
-          ctx.strokeStyle = 'rgba(246,239,227,0.12)';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(o.x1, o.y1);
-          ctx.lineTo(o.x2, o.y2);
-          ctx.stroke();
-        }
-        continue;
-      }
-      if (o.kind === 'circle') {
-        if (o.bumper !== undefined) continue; // drawn with the lamps
-        const g = ctx.createRadialGradient(o.cx - o.r * 0.3, o.cy - o.r * 0.4, 1, o.cx, o.cy, o.r);
-        g.addColorStop(0, C.metalLit);
-        g.addColorStop(1, C.rail);
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(o.cx, o.cy, o.r, 0, TAU);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(11,9,19,0.6)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        continue;
-      }
-      if (o.kind !== 'seg') continue;
-
-      const isTarget = o.target !== undefined;
-      const surf = o.surf;
-      ctx.lineCap = 'round';
-      if (isTarget) {
-        const lit = (this.lampT[`target${o.target}`] || 0) > 0;
-        ctx.strokeStyle = lit ? C.ink : C.teal;
-        ctx.lineWidth = 12;
-      } else if (surf === 'rubber') {
-        // Thinner than a flipper, and a lighter red: at flipper weight in
-        // flipper red these read as two extra flippers halfway up the table.
-        const lit = (this.lampT[o.sling === 'L' ? 'slingL' : 'slingR'] || 0) > 0;
-        ctx.strokeStyle = lit ? '#ffd9c4' : '#c9483a';
-        ctx.lineWidth = 7;
-      } else if (surf === 'metal') {
-        ctx.strokeStyle = C.metal;
-        ctx.lineWidth = 9;
-      } else {
-        ctx.strokeStyle = C.rail;
-        ctx.lineWidth = 10;
-      }
-      ctx.beginPath();
-      ctx.moveTo(o.x1, o.y1);
-      ctx.lineTo(o.x2, o.y2);
-      ctx.stroke();
-      // A thin highlight along the top of each rail.
-      ctx.strokeStyle = 'rgba(246,239,227,0.16)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(o.x1, o.y1 - 3);
-      ctx.lineTo(o.x2, o.y2 - 3);
-      ctx.stroke();
-    }
-  }
-
-  drawLamps(ctx) {
+  drawInserts(ctx) {
     for (const l of this.table.lamps) {
-      const key = l.kind === 'bumper' ? `bumper${l.i}` : l.kind === 'target' ? `target${l.i}` : l.kind === 'sling' ? 'slingL' : l.kind;
-      const t = clamp(this.lampT[key] || 0, 0, 1);
-
-      if (l.kind === 'bumper') {
-        // A pop bumper: skirt, body, and a cap that flares when it fires.
-        ctx.fillStyle = 'rgba(11,9,19,0.5)';
-        ctx.beginPath();
-        ctx.arc(l.x, l.y + 4, l.r + 3, 0, TAU);
-        ctx.fill();
-        const g = ctx.createRadialGradient(l.x - l.r * 0.3, l.y - l.r * 0.4, 2, l.x, l.y, l.r);
-        g.addColorStop(0, t > 0 ? '#fff6e2' : '#6b5f9c');
-        g.addColorStop(1, t > 0 ? C.amber : '#3b3560');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(l.x, l.y, l.r, 0, TAU);
-        ctx.fill();
-        ctx.strokeStyle = t > 0 ? C.ink : C.rail;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.fillStyle = t > 0 ? C.ink : '#8d85ab';
-        ctx.beginPath();
-        ctx.arc(l.x, l.y, l.r * 0.34, 0, TAU);
-        ctx.fill();
-        if (t > 0) {
-          ctx.globalAlpha = t * 0.5;
-          ctx.fillStyle = C.amber;
-          ctx.beginPath();
-          ctx.arc(l.x, l.y, l.r * (1.5 + t), 0, TAU);
-          ctx.fill();
-          ctx.globalAlpha = 1;
-        }
-        continue;
-      }
-
+      if (l.kind === 'bumper') continue; // drawn with the bumper body
+      const on = this.lampOn(l);
+      const col = l.kind === 'fuel' ? C.amber : l.kind === 'selector' ? C.green : C.line;
+      insert(ctx, l.x, l.y, l.r, on ? col : C.lampOff, on);
       if (l.kind === 'spinner') {
-        // Reads as a spinner by leaning with its recent activity.
-        const spin = Math.sin(this.time * 14) * t;
+        // Leans with its recent activity, so it reads as a spinner.
+        const t = clamp(this.lampT.spinner || 0, 0, 1);
+        const lean = Math.sin(this.time * 15) * t;
         ctx.save();
         ctx.translate(l.x, l.y);
-        ctx.strokeStyle = C.metal;
+        ctx.strokeStyle = C.chrome;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(-l.r, -l.r * 0.8);
-        ctx.lineTo(-l.r, l.r * 0.8);
-        ctx.moveTo(l.r, -l.r * 0.8);
-        ctx.lineTo(l.r, l.r * 0.8);
+        ctx.moveTo(-l.r, -l.r * 0.85);
+        ctx.lineTo(-l.r, l.r * 0.85);
+        ctx.moveTo(l.r, -l.r * 0.85);
+        ctx.lineTo(l.r, l.r * 0.85);
         ctx.stroke();
-        ctx.scale(1, 0.3 + Math.abs(spin) * 0.7);
-        ctx.fillStyle = t > 0 ? C.teal : '#4a4470';
-        ctx.fillRect(-l.r * 0.9, -l.r * 0.9, l.r * 1.8, l.r * 1.8);
+        ctx.scale(1, 0.25 + Math.abs(lean) * 0.75);
+        const gr = ctx.createLinearGradient(0, -l.r, 0, l.r);
+        gr.addColorStop(0, t > 0 ? '#ffffff' : '#6f7fa6');
+        gr.addColorStop(1, t > 0 ? C.line : '#39456d');
+        ctx.fillStyle = gr;
+        ctx.fillRect(-l.r * 0.85, -l.r * 0.85, l.r * 1.7, l.r * 1.7);
         ctx.restore();
-        continue;
-      }
-
-      // Generic round insert lamp.
-      const on = t > 0 || (l.kind === 'selector' && !this.mission);
-      ctx.fillStyle = on ? C.teal : C.lampOff;
-      ctx.beginPath();
-      ctx.arc(l.x, l.y, l.r, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(11,9,19,0.6)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      if (on) {
-        ctx.globalAlpha = 0.35;
-        ctx.beginPath();
-        ctx.arc(l.x, l.y, l.r * 2.1, 0, TAU);
-        ctx.fill();
-        ctx.globalAlpha = 1;
       }
     }
 
-    // Sensor rings, so the orbit and mission shots are visible targets.
+    // The two bar inserts: bonus multiplier and rank ladder.
+    for (const b of this.table.decor.bars) {
+      const n = b.kind === 'bonus' ? 5 : RANKS.length;
+      const lit = b.kind === 'bonus' ? this.bonusX : this.rankIdx + 1;
+      const cw = b.w / n;
+      for (let i = 0; i < n; i++) {
+        const on = i < lit;
+        ctx.fillStyle = on ? (b.kind === 'bonus' ? C.amber : C.green) : C.lampOff;
+        ctx.globalAlpha = on ? 0.95 : 0.6;
+        ctx.fillRect(b.x + i * cw + 1.5, b.y, cw - 3, b.h);
+      }
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(127,201,255,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+    }
+
+    // Shot rings, so the orbit and mission targets read as things to aim at.
     for (const s of this.table.sensors) {
       if (!s.label) continue;
       const armed = s.id === 'selector' ? !this.mission : true;
-      ctx.strokeStyle = armed ? 'rgba(67,224,192,0.5)' : 'rgba(154,146,184,0.28)';
+      ctx.strokeStyle = armed ? 'rgba(78,240,160,0.55)' : 'rgba(143,163,204,0.28)';
       ctx.lineWidth = 2;
       ctx.setLineDash([7, 7]);
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, TAU);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = armed ? 'rgba(67,224,192,0.75)' : 'rgba(154,146,184,0.4)';
-      ctx.font = '700 13px ui-rounded, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(s.label, s.x, s.y + s.r + 16);
+    }
+  }
+
+  lampOn(l) {
+    if (l.kind === 'fuel') return this.fuel[l.i] || (this.lampT[`fuel${l.i}`] || 0) > 0;
+    if (l.kind === 'selector') return !this.mission || (this.lampT.selector || 0) > 0;
+    if (l.kind === 'target') return !this.table.targets[l.i].off;
+    if (l.kind === 'sling') return (this.lampT[`sling${l.side}`] || 0) > 0;
+    if (l.kind === 'inlane') return (this.lampT[`inlane${l.side}`] || 0) > 0;
+    return (this.lampT[l.kind] || 0) > 0;
+  }
+
+  drawTargets(ctx) {
+    for (const o of this.table.targets) {
+      const nx = o.y2 - o.y1;
+      const ny = -(o.x2 - o.x1);
+      const len = Math.hypot(nx, ny) || 1;
+      if (o.off) {
+        ctx.strokeStyle = 'rgba(127,201,255,0.16)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([4, 5]);
+        line(ctx, o.x1, o.y1, o.x2, o.y2);
+        ctx.setLineDash([]);
+        continue;
+      }
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(3,6,20,0.8)';
+      ctx.lineWidth = 15;
+      line(ctx, o.x1, o.y1, o.x2, o.y2);
+      const gr = ctx.createLinearGradient(
+        o.x1 - (nx / len) * 7, o.y1 - (ny / len) * 7,
+        o.x1 + (nx / len) * 7, o.y1 + (ny / len) * 7
+      );
+      gr.addColorStop(0, '#ffffff');
+      gr.addColorStop(0.5, C.line);
+      gr.addColorStop(1, '#2a63a8');
+      ctx.strokeStyle = gr;
+      ctx.lineWidth = 11;
+      line(ctx, o.x1, o.y1, o.x2, o.y2);
+      ctx.lineCap = 'round';
+    }
+  }
+
+  /* The plate each kicker's rubber is stretched over, then the rubber itself. */
+  drawSlings(ctx) {
+    for (const pts of this.table.slingPlates || []) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]);
+      ctx.closePath();
+      const gr = ctx.createLinearGradient(pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+      gr.addColorStop(0, '#26325c');
+      gr.addColorStop(1, '#121a38');
+      ctx.fillStyle = gr;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(3,6,20,0.7)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    for (const o of this.table.solids) {
+      if (!o.sling) continue;
+      const lit = (this.lampT[`sling${o.sling}`] || 0) > 0;
+      /* Only the long face carries rubber. Drawing all three edges of the
+       * triangle in flipper red made each kicker read as an enormous red arrow
+       * halfway up the table; the other two edges are just the plate's rim. */
+      ctx.lineCap = 'round';
+      if (!o.kick) {
+        ctx.strokeStyle = C.chromeDark;
+        ctx.lineWidth = 4;
+        line(ctx, o.x1, o.y1, o.x2, o.y2);
+        continue;
+      }
+      ctx.strokeStyle = lit ? '#ffe0d2' : C.rubber;
+      ctx.lineWidth = 8;
+      line(ctx, o.x1, o.y1, o.x2, o.y2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1.5;
+      line(ctx, o.x1, o.y1 - 2, o.x2, o.y2 - 2);
+    }
+  }
+
+  drawBumpers(ctx) {
+    for (const l of this.table.lamps) {
+      if (l.kind !== 'bumper') continue;
+      const t = clamp(this.lampT[`bumper${l.i}`] || 0, 0, 1);
+      // Skirt.
+      ctx.fillStyle = 'rgba(3,6,20,0.55)';
+      ctx.beginPath();
+      ctx.arc(l.x, l.y + 5, l.r + 4, 0, TAU);
+      ctx.fill();
+      const ring = ctx.createRadialGradient(l.x, l.y, l.r * 0.6, l.x, l.y, l.r);
+      ring.addColorStop(0, C.chromeDark);
+      ring.addColorStop(0.7, C.chromeMid);
+      ring.addColorStop(1, C.chrome);
+      ctx.fillStyle = ring;
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, l.r, 0, TAU);
+      ctx.fill();
+      // Cap.
+      const hue = BUMPER_CAP[l.i % BUMPER_CAP.length];
+      const cap = ctx.createRadialGradient(l.x - l.r * 0.3, l.y - l.r * 0.35, 2, l.x, l.y, l.r * 0.74);
+      cap.addColorStop(0, t > 0 ? '#ffffff' : hue[0]);
+      cap.addColorStop(1, t > 0 ? C.amber : hue[1]);
+      ctx.fillStyle = cap;
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, l.r * 0.74, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(3,6,20,0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = t > 0 ? '#ffffff' : '#93a4cc';
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, l.r * 0.26, 0, TAU);
+      ctx.fill();
+      if (t > 0) {
+        ctx.globalAlpha = t * 0.45;
+        ctx.fillStyle = C.amber;
+        ctx.beginPath();
+        ctx.arc(l.x, l.y, l.r * (1.4 + t), 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
   }
 
   drawFlippers(ctx) {
     for (const f of this.table.flippers) {
       const tip = f.tip();
-      ctx.strokeStyle = 'rgba(11,9,19,0.55)';
-      ctx.lineWidth = (f.radius + 3) * 2;
       ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(f.x, f.y + 5);
-      ctx.lineTo(tip.x, tip.y + 5);
-      ctx.stroke();
+      ctx.strokeStyle = 'rgba(3,6,20,0.6)';
+      ctx.lineWidth = (f.radius + 3) * 2;
+      line(ctx, f.x, f.y + 5, tip.x, tip.y + 5);
 
       const g = ctx.createLinearGradient(f.x, f.y - f.radius, f.x, f.y + f.radius);
-      g.addColorStop(0, '#ff8a70');
-      g.addColorStop(0.5, C.red);
-      g.addColorStop(1, '#b32a1c');
+      g.addColorStop(0, '#ff9c84');
+      g.addColorStop(0.45, C.red);
+      g.addColorStop(1, '#9c2317');
       ctx.strokeStyle = g;
       ctx.lineWidth = f.radius * 2;
-      ctx.beginPath();
-      ctx.moveTo(f.x, f.y);
-      ctx.lineTo(tip.x, tip.y);
-      ctx.stroke();
+      line(ctx, f.x, f.y, tip.x, tip.y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = 2.5;
+      line(ctx, f.x, f.y - f.radius * 0.42, tip.x, tip.y - f.radius * 0.42);
 
-      ctx.fillStyle = C.metalLit;
+      const hub = ctx.createRadialGradient(f.x - 2, f.y - 2, 1, f.x, f.y, 6);
+      hub.addColorStop(0, '#ffffff');
+      hub.addColorStop(1, C.chromeMid);
+      ctx.fillStyle = hub;
       ctx.beginPath();
-      ctx.arc(f.x, f.y, 5, 0, TAU);
+      ctx.arc(f.x, f.y, 5.5, 0, TAU);
       ctx.fill();
     }
   }
@@ -857,40 +1148,49 @@ export class Game {
   drawPlunger(ctx) {
     const p = this.table.plungerLane;
     const y = p.y + 34 - this.plunger * 26;
-    ctx.strokeStyle = C.metal;
+    ctx.strokeStyle = C.chromeMid;
     ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.moveTo(519, y + 26);
-    ctx.lineTo(519, y);
-    ctx.stroke();
-    ctx.fillStyle = this.inLane ? C.amber : C.rail;
+    line(ctx, 519, y + 30, 519, y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 2;
+    line(ctx, 517, y + 30, 517, y);
+    const knob = ctx.createRadialGradient(515, y - 3, 1, 519, y, 11);
+    knob.addColorStop(0, this.inLane ? '#ffe6b0' : '#a9b6d4');
+    knob.addColorStop(1, this.inLane ? C.amber : C.chromeDark);
+    ctx.fillStyle = knob;
     ctx.beginPath();
     ctx.arc(519, y, 11, 0, TAU);
     ctx.fill();
     if (this.inLane && this.plunger > 0.02) {
-      ctx.fillStyle = C.teal;
-      ctx.fillRect(536, 900 - this.plunger * 120, 5, this.plunger * 120);
+      ctx.fillStyle = C.green;
+      ctx.fillRect(535, 900 - this.plunger * 120, 5, this.plunger * 120);
     }
   }
 
   drawBalls(ctx) {
     for (const b of this.balls) {
-      ctx.fillStyle = 'rgba(11,9,19,0.5)';
+      ctx.fillStyle = 'rgba(3,6,20,0.5)';
       ctx.beginPath();
       ctx.ellipse(b.x + 3, b.y + 6, b.r, b.r * 0.8, 0, 0, TAU);
       ctx.fill();
       const g = ctx.createRadialGradient(b.x - b.r * 0.4, b.y - b.r * 0.45, 1, b.x, b.y, b.r);
       g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.5, C.ball);
-      g.addColorStop(1, '#6f7594');
+      g.addColorStop(0.42, C.ball);
+      g.addColorStop(1, '#5d6a92');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      // The bright pinprick that makes chrome look like chrome.
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.beginPath();
-      ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.4, b.r * 0.22, 0, TAU);
+      ctx.arc(b.x - b.r * 0.34, b.y - b.r * 0.4, b.r * 0.2, 0, TAU);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r - 0.5, 0.6, 2.2);
+      ctx.stroke();
     }
   }
 
@@ -907,8 +1207,8 @@ export class Game {
     ctx.textAlign = 'center';
     for (const p of this.popups) {
       ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
-      ctx.font = `700 ${Math.round(22 * p.size)}px ui-rounded, system-ui, sans-serif`;
-      ctx.fillStyle = 'rgba(11,9,19,0.7)';
+      ctx.font = `700 ${Math.round(22 * p.size)}px ui-rounded, "Trebuchet MS", system-ui, sans-serif`;
+      ctx.fillStyle = 'rgba(3,6,20,0.7)';
       ctx.fillText(p.text, p.x + 2, p.y + 2);
       ctx.fillStyle = p.color;
       ctx.fillText(p.text, p.x, p.y);
@@ -921,11 +1221,14 @@ export class Game {
     const a = clamp(this.messageT * 1.6, 0, 1);
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
-    ctx.font = '700 30px ui-rounded, system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(11,9,19,0.75)';
-    ctx.fillRect(30, 540, TABLE_W - 60, 52);
+    ctx.fillStyle = 'rgba(5,9,29,0.86)';
+    ctx.fillRect(40, 542, TABLE_W - 80, 46);
+    ctx.strokeStyle = 'rgba(127,201,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 542, TABLE_W - 80, 46);
+    ctx.font = '700 24px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
     ctx.fillStyle = this.tilted ? C.red : C.amber;
-    ctx.fillText(this.message, TABLE_W / 2, 576);
+    tracked(ctx, this.message, TABLE_W / 2, 573, 2);
     ctx.globalAlpha = 1;
   }
 
@@ -939,40 +1242,96 @@ export class Game {
       { x: this.w - w - 7, label: 'RANK', value: this.rank.toUpperCase() },
     ];
     for (const b of boxes) {
-      ctx.fillStyle = '#141130';
+      ctx.fillStyle = '#0b1230';
       ctx.fillRect(b.x, this.offY, w, 118);
-      ctx.strokeStyle = C.rail;
+      ctx.strokeStyle = 'rgba(127,201,255,0.4)';
       ctx.lineWidth = 2;
       ctx.strokeRect(b.x + 1, this.offY + 1, w - 2, 116);
       ctx.textAlign = 'center';
       ctx.fillStyle = C.dim;
-      ctx.font = '700 11px ui-rounded, system-ui, sans-serif';
-      ctx.fillText(b.label, b.x + w / 2, this.offY + 26);
+      ctx.font = '700 11px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
+      tracked(ctx, b.label, b.x + w / 2, this.offY + 26, 3);
       ctx.fillStyle = C.amber;
-      ctx.font = `700 ${clamp(Math.floor(w / 6), 12, 26)}px ui-rounded, system-ui, sans-serif`;
+      ctx.font = `700 ${clamp(Math.floor(w / 6), 12, 26)}px ui-rounded, "Trebuchet MS", system-ui, sans-serif`;
       ctx.fillText(b.value, b.x + w / 2, this.offY + 62);
     }
 
     // Mission panel under the left box.
     if (this.mission) {
       const x = 7;
-      ctx.fillStyle = '#141130';
+      ctx.fillStyle = '#0b1230';
       ctx.fillRect(x, this.offY + 128, w, 96);
-      ctx.strokeStyle = C.teal;
+      ctx.strokeStyle = C.green;
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 1, this.offY + 129, w - 2, 94);
       ctx.textAlign = 'center';
-      ctx.fillStyle = C.teal;
-      ctx.font = '700 11px ui-rounded, system-ui, sans-serif';
-      ctx.fillText('MISSION', x + w / 2, this.offY + 152);
+      ctx.fillStyle = C.green;
+      ctx.font = '700 11px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
+      tracked(ctx, 'MISSION', x + w / 2, this.offY + 152, 3);
       ctx.fillStyle = C.ink;
-      ctx.font = '700 13px ui-rounded, system-ui, sans-serif';
+      ctx.font = '700 13px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
       ctx.fillText(`${this.missionProgress}/${this.mission.goal}`, x + w / 2, this.offY + 196);
       ctx.fillStyle = C.dim;
-      ctx.font = '600 10px ui-rounded, system-ui, sans-serif';
+      ctx.font = '600 10px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
       ctx.fillText(this.mission.name.slice(0, 14), x + w / 2, this.offY + 174);
     }
   }
+}
+
+/* --- small drawing helpers ------------------------------------------------ */
+
+function line(g, x1, y1, x2, y2) {
+  g.beginPath();
+  g.moveTo(x1, y1);
+  g.lineTo(x2, y2);
+  g.stroke();
+}
+
+/** Centred text with letter spacing, which canvas has no property for and which
+ *  is most of what makes a playfield decal look printed rather than typed. */
+function tracked(g, text, x, y, track) {
+  if (!track) {
+    g.fillText(text, x, y);
+    return;
+  }
+  const widths = [...text].map((c) => g.measureText(c).width);
+  const total = widths.reduce((a, b) => a + b, 0) + track * (text.length - 1);
+  const prev = g.textAlign;
+  g.textAlign = 'left';
+  let cx = prev === 'left' ? x : x - total / 2;
+  for (let i = 0; i < text.length; i++) {
+    g.fillText(text[i], cx, y);
+    cx += widths[i] + track;
+  }
+  g.textAlign = prev;
+}
+
+/** A playfield insert: a lens flush in the wood, dark when off, glowing when on. */
+function insert(g, x, y, r, colour, on) {
+  g.fillStyle = 'rgba(3,6,20,0.55)';
+  g.beginPath();
+  g.arc(x, y + 1.5, r + 2, 0, TAU);
+  g.fill();
+  g.fillStyle = colour;
+  g.beginPath();
+  g.arc(x, y, r, 0, TAU);
+  g.fill();
+  if (on) {
+    g.globalAlpha = 0.3;
+    g.beginPath();
+    g.arc(x, y, r * 2.1, 0, TAU);
+    g.fill();
+    g.globalAlpha = 1;
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.beginPath();
+    g.arc(x - r * 0.3, y - r * 0.35, r * 0.34, 0, TAU);
+    g.fill();
+  }
+  g.strokeStyle = 'rgba(127,201,255,0.35)';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.arc(x, y, r, 0, TAU);
+  g.stroke();
 }
 
 export { MISSIONS, RANKS, SURF, lerp };
