@@ -5,10 +5,17 @@ small API Worker on Cloudflare. The landing page and per-game pages implement th
 design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
 with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-The first cabinet is **Chicken Attack** (`/chicken-attack/`, game page at
-`/games/chicken-attack/`): an arcade shooter in the spirit of *Chicken Invaders* — nine weapons,
-timed power-ups, alternating bosses, difficulty modes, autosaved runs, fully playable offline.
-Everything in it is generated procedurally at runtime (Canvas2D + Web Audio).
+Two cabinets are open:
+
+- **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
+  the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
+  modes, autosaved runs.
+- **Beaver Dash** (`/beaver-dash/`, page at `/games/beaver-dash/`) — a one-button endless runner:
+  jump the stumps, double-jump the log piles, and *stay grounded* when the heron swoops at jump
+  height. Speeds up every 500 m; distance is banked alongside the score.
+
+Both are fully playable offline and every pixel and sound in them is generated procedurally at
+runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
 
 ## Stack
 
@@ -54,7 +61,7 @@ exist — it also applies pending D1 migrations before deploying.
 | Route | Method | Purpose |
 | --- | --- | --- |
 | `/api/scores?game=<slug>&period=week\|all&limit=N` | GET | Top scores (week = since Monday 00:00 UTC) |
-| `/api/scores` | POST | Submit a run `{ id, game, name, score, wave, difficulty }` — upserts by client run id, so saving a name at game over renames the run instead of duplicating it; a rename can never change the score |
+| `/api/scores` | POST | Submit a run `{ id, game, name, score, wave, difficulty }` — upserts by client run id, so saving a name at game over renames the run instead of duplicating it; a rename can never change the score. `wave` is whatever secondary number the game ranks by: waves cleared in Chicken Attack, metres run in Beaver Dash |
 | `/api/signup` | POST | Newsletter signup `{ email }` (honeypot field silently accepted) |
 
 If the D1 binding is missing, reads return empty lists and writes 503 — the site works without
@@ -83,13 +90,15 @@ src/                        Astro site (Beaver Games design)
 worker/index.js             /api/scores + /api/signup on D1
 migrations/                 D1 schema
 public/
-  chicken-attack/           the game — self-contained PWA, unchanged by the site build
+  chicken-attack/           game — self-contained PWA, unchanged by the site build
+  beaver-dash/              game — same shape, own service worker + icons
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
   media/                    cabinet/stage art (captured from real gameplay)
   sw.js                     self-destruct stub migrating pre-Astro installs
   _headers                  security headers + cache policy
 wrangler.jsonc              Workers config: assets + Worker + D1
-tools/make-icons.mjs        regenerates the game's icon set (npm run icons)
+tools/make-icons.mjs        Chicken Attack icon set
+tools/make-beaver-icons.mjs Beaver Dash icon set   (npm run icons runs both)
 ```
 
 ## Notes that save debugging time
@@ -119,3 +128,22 @@ Difficulty modes (Rookie/Veteran/Superstar), autosaved runs with a Continue butt
 with ten power levels, six timed power-ups, two boss archetypes with three phases each, feast
 waves, local top-10 plus the global weekly board, `prefers-reduced-motion` support, and a service
 worker that keeps it fully playable offline. `window.__game` is exposed for debugging.
+
+## Beaver Dash (the game)
+
+| Action | Touch | Keyboard |
+| --- | --- | --- |
+| Jump | tap anywhere | Space / ↑ / W |
+| Double jump | tap again mid-air | press again mid-air |
+| Float the jump | keep holding the tap | keep holding the key |
+| Pause | pause button | P / Esc |
+
+Four obstacle archetypes, and the one that makes the game: the **heron** flies at exactly jump
+height, so the correct response to it is to do nothing. Acorns (25 pts) and golden acorns (250)
+arc along the safe jump path, so the collectibles double as the level's readability. Speed steps
+up every 500 m and gaps tighten with it; the opening ~2.3 screens are deliberately empty so a
+run never dies before the player's hands are on it.
+
+Everything scales off one unit `u = clamp(height / 420, 0.7, 2)` — gravity, jump impulse, ground
+line, obstacle sizes — and distance is divided back out by `u`, so a phone and a desktop measure
+the same metre and the leaderboard compares like with like.

@@ -29,6 +29,9 @@
 /chicken-attack/sw.js
   Cache-Control: no-cache, must-revalidate
 
+/beaver-dash/sw.js
+  Cache-Control: no-cache, must-revalidate
+
 /
   Cache-Control: no-cache, must-revalidate
 
@@ -58,4 +61,23 @@
   Cache-Control: public, max-age=0, must-revalidate
 
 /chicken-attack/icons/*
+  Cache-Control: public, max-age=604800
+
+# Beaver Dash
+/beaver-dash/
+  Cache-Control: no-cache, must-revalidate
+
+/beaver-dash/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/beaver-dash/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/beaver-dash/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/beaver-dash/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/beaver-dash/icons/*
   Cache-Control: public, max-age=604800

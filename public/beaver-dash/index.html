@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Beaver Dash — one button, endless forest</title>
+    <meta name="description" content="An endless runner: one button, a very determined beaver, and a forest that does not want you to make it. Jump stumps, double-jump log piles, and stay low when the heron swoops." />
+    <meta name="theme-color" content="#12101c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Beaver Dash" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="Game screen" role="img"></canvas>
+
+    <div id="app">
+      <!-- HUD -->
+      <div id="hud" class="hud is-hidden">
+        <div class="hud-left">
+          <div id="hud-score" class="hud-score">0</div>
+          <div id="hud-dist" class="hud-dist">0m</div>
+        </div>
+        <div class="hud-right">
+          <span class="hud-acorn-dot" aria-hidden="true"></span>
+          <span id="hud-acorns">0</span>
+        </div>
+        <p id="milestone" class="milestone" aria-live="polite"></p>
+      </div>
+
+      <!-- Menu -->
+      <section id="screen-menu" class="panel-wrap" aria-label="Main menu">
+        <div class="panel">
+          <p class="kicker">ONE BUTTON · ENDLESS FOREST</p>
+          <h1 class="title">BEAVER<br />DASH</h1>
+          <p class="copy">
+            Tap to jump. Tap again mid-air for a double jump.
+            When the <b class="c-heron">heron</b> swoops — stay on the ground.
+          </p>
+          <button id="btn-start" class="btn-big" type="button">▶ RUN</button>
+          <p id="menu-best" class="best"></p>
+          <div class="menu-row">
+            <button id="btn-sound" class="btn-small" type="button">♪ Sound on</button>
+            <a class="btn-small btn-link" href="../">← Arcade</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Game over -->
+      <section id="screen-over" class="panel-wrap is-hidden" aria-label="Run over">
+        <div class="panel">
+          <h2 id="over-title" class="title-sm">DAM IT!</h2>
+          <p id="over-cause" class="copy copy-dim"></p>
+          <div class="result-grid">
+            <div><span>Score</span><b id="over-score">0</b></div>
+            <div><span>Distance</span><b id="over-dist">0m</b></div>
+            <div><span>Acorns</span><b id="over-acorns">0</b></div>
+            <div><span>Best</span><b id="over-best">0</b></div>
+          </div>
+          <form id="name-form" class="name-form" autocomplete="off">
+            <label class="name-label" for="name-input">Name on the board</label>
+            <div class="name-row">
+              <input id="name-input" class="name-input" type="text" maxlength="12" spellcheck="false" autocapitalize="characters" />
+              <button id="btn-save-name" class="btn-small" type="submit">Save</button>
+            </div>
+          </form>
+          <button id="btn-again" class="btn-big" type="button">▶ RUN AGAIN</button>
+          <a class="btn-small btn-link btn-center" href="../">← Back to the arcade</a>
+        </div>
+      </section>
+    </div>
+
+    <noscript><p class="noscript-note">Beaver Dash needs JavaScript to run.</p></noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
