@@ -1557,20 +1557,22 @@ a.game-card:hover {
    is what makes the lettering legible — it cannot be shrunk the way a separate
    mark could. */
 .brand-logo-header {
-  height: 64px;
+  /* The badge is wide (roughly 2:1), so this reads much larger than the same
+     number did on the square logo, and the type beside it is real type. */
+  height: 46px;
 }
 
 .brand-logo-footer {
-  height: 96px;
+  height: 104px;
 }
 
 @media (max-width: 620px) {
   .brand-logo-header {
-    height: 46px;
+    height: 38px;
   }
 
   .brand-logo-footer {
-    height: 76px;
+    height: 82px;
   }
 }
 

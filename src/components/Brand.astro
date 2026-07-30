@@ -2,61 +2,56 @@
 /*
  * The Beaver Games brand mark.
  *
- * If a logo image has been dropped into public/media/ it is used; otherwise this
- * falls back to a CSS mark drawn in the same palette. The check happens at build
- * time — Astro components run in Node — so adding the file is the whole job:
- * drop it in, rebuild, and every header and footer picks it up with no code
- * change. No 404 in the meantime, and no inline error handler, which the site's
- * CSP would block anyway.
+ * Two lockups from the same artwork:
+ *
+ *   header  the cropped mascot badge beside real CSS type. The full logo has
+ *           "BEAVER GAMES" baked into a square image, so at header height the
+ *           lettering is decorative rather than readable — a small crisp badge
+ *           plus actual text beats a shrunken picture of text.
+ *   footer  the full logo, which has the room to be itself.
+ *
+ * Each falls back: mark -> full logo -> a CSS mark in the same palette. The check
+ * is at build time (Astro components run in Node), so dropping a file into
+ * public/media/ is the whole job — no 404 for artwork that is not there yet, and
+ * no inline error handler, which the CSP would refuse.
  *
  * NO INLINE STYLES. The site ships `style-src 'self'` with no `unsafe-inline`, so
- * a `style="height:64px"` attribute is silently refused and logs a CSP violation
- * on every page load. Sizes are therefore classes in global.css, not props baked
- * into markup. The `height`/`width` attributes stay because they are HTML, not
- * CSS, and they give the browser an aspect ratio to reserve before the image
- * loads.
- *
- * Accepted names, first match wins, so whichever form you have works.
+ * a style attribute is silently refused and logs a violation on every page load.
+ * Sizes are classes in global.css. The width/height attributes stay because they
+ * are HTML, not CSS, and they let the browser reserve the aspect ratio.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface Props {
-  /** Which size class to use. Heights live in global.css. */
   variant?: 'header' | 'footer';
-  /** Hide the wordmark when the logo image already contains one. */
-  wordmark?: boolean;
 }
 
-const { variant = 'header', wordmark = true } = Astro.props;
+const { variant = 'header' } = Astro.props;
 
-const CANDIDATES = [
-  'beaver-games-logo.png',
-  'beaver-games-logo.webp',
-  'beaver-games-logo.svg',
-  'logo.png',
-  'logo.svg',
-];
+const MARKS = ['beaver-games-mark.png', 'beaver-games-mark.webp', 'beaver-games-mark.svg'];
+const FULL = ['beaver-games-logo.png', 'beaver-games-logo.webp', 'beaver-games-logo.svg', 'logo.png', 'logo.svg'];
 
 const mediaDir = join(process.cwd(), 'public', 'media');
-const found = CANDIDATES.find((f) => existsSync(join(mediaDir, f)));
-const logo = found ? `/media/${found}` : null;
+const find = (names) => names.find((f) => existsSync(join(mediaDir, f)));
+
+// The header prefers the badge; the footer prefers the whole thing.
+const chosen = variant === 'header' ? find(MARKS) || find(FULL) : find(FULL) || find(MARKS);
+const src = chosen ? `/media/${chosen}` : null;
+// Show type beside the image only when the image is the wordmark-free badge.
+const withType = variant === 'header' && !!chosen && MARKS.includes(chosen);
 ---
 
 {
-  logo ? (
-    <img
-      src={logo}
-      alt="Beaver Games"
-      width="1024"
-      height="1024"
-      class={`brand-logo brand-logo-${variant}`}
-      decoding="async"
-    />
+  src ? (
+    <>
+      <img src={src} alt="Beaver Games" class={`brand-logo brand-logo-${variant}`} decoding="async" />
+      {withType && <span class="brand-name">BEAVER GAMES</span>}
+    </>
   ) : (
     <span class={`brand-fallback brand-fallback-${variant}`}>
       <span class="brand-mark">B</span>
-      {wordmark && <span class="brand-name">BEAVER GAMES</span>}
+      <span class="brand-name">BEAVER GAMES</span>
     </span>
   )
 }
