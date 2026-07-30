@@ -5,7 +5,7 @@
  */
 
 import { TAU, rand, chance, clamp, seededRandom } from './util.js';
-import { Chicken, Asteroid, Boss } from './enemies.js';
+import { Chicken, Asteroid, Boss, Mothership } from './enemies.js';
 
 /* ASCII formation art: '#' normal chicken, 'o' brown, 'X' armoured. */
 const SHAPES = {
@@ -131,6 +131,7 @@ const WAVE_KINDS = [
 ];
 
 const KIND_LABELS = {
+  feast: 'FEAST TIME',
   grid: 'CHICKEN SQUADRON',
   shape: 'FLYING FORMATION',
   flyby: 'STRAFING RUN',
@@ -151,7 +152,13 @@ export class Wave {
     this.queue = []; // [{ t, spawn() }]
     this.spawned = 0;
     this.isBoss = num % 5 === 0;
-    this.kind = this.isBoss ? 'boss' : WAVE_KINDS[(num - 1 - Math.floor((num - 1) / 5)) % WAVE_KINDS.length];
+    // Every seventh non-boss wave is a breather: food rains, nothing shoots.
+    this.isFeast = !this.isBoss && num % 7 === 0;
+    this.kind = this.isBoss
+      ? 'boss'
+      : this.isFeast
+        ? 'feast'
+        : WAVE_KINDS[(num - 1 - Math.floor((num - 1) / 5)) % WAVE_KINDS.length];
     this.label = KIND_LABELS[this.kind];
     this.rng = seededRandom(num * 9176 + 13);
     this.build();
@@ -176,6 +183,9 @@ export class Wave {
     switch (this.kind) {
       case 'boss':
         this.buildBoss();
+        break;
+      case 'feast':
+        this.buildFeast();
         break;
       case 'grid': {
         const cols = clamp(5 + Math.floor(tier * 0.7), 5, 8);
@@ -386,11 +396,44 @@ export class Wave {
     this.total = this.queue.length;
   }
 
+  /**
+   * Bonus wave: a shower of drumsticks and gifts plus a handful of harmless
+   * chickens that always drop food. Nothing lays eggs.
+   */
+  buildFeast() {
+    const g = this.game;
+    const tier = Math.floor((this.num - 1) / 5);
+    const treats = 26 + Math.min(14, tier * 3);
+    for (let i = 0; i < treats; i++) {
+      this.push(0.3 + i * 0.28, () => {
+        const x = rand(g.w * 0.9, g.w * 0.1);
+        g.spawnPickup(x, -20 * g.unit, chance(0.12) ? g.rollGift() : 'food');
+      });
+    }
+    // A few plump chickens to shoot for extra drumsticks.
+    for (let i = 0; i < 6; i++) {
+      this.push(1 + i * 1.15, () =>
+        this.chicken({
+          breed: chance(0.4) ? 'brown' : 'white',
+          mode: 'fall',
+          x: rand(g.w * 0.86, g.w * 0.14),
+          y: -30 * g.unit,
+          speed: 62,
+          sway: 34,
+          canLay: false,
+          feast: true,
+        })
+      );
+    }
+  }
+
   buildBoss() {
     const g = this.game;
     const n = this.num;
     this.push(0.4, () => {
-      const boss = new Boss(g, n);
+      // Bosses alternate between the giant hen and the chicken mothership.
+      const Kind = Math.floor(n / 5) % 2 === 1 ? Boss : Mothership;
+      const boss = new Kind(g, n);
       g.addEnemy(boss);
       g.boss = boss;
     });
@@ -430,15 +473,76 @@ export class Wave {
   }
 }
 
-/** Difficulty curve. Everything scales off the wave number. */
-export function difficultyFor(wave) {
+/*
+ * Difficulty modes. Each one scales the per-wave curve below and sets the
+ * starting loadout; harder modes pay more score.
+ */
+export const DIFFICULTIES = {
+  rookie: {
+    id: 'rookie',
+    badge: 'ROOKIE',
+    name: 'Rookie',
+    short: 'ROOKIE',
+    blurb: 'Slower eggs, five ships. Learn the ropes.',
+    lives: 5,
+    missiles: 5,
+    hp: 0.72,
+    speed: 0.86,
+    layRate: 0.6,
+    eggSpeed: 0.84,
+    bossHp: 0.7,
+    bossRate: 0.8,
+    scoreMul: 0.7,
+  },
+  veteran: {
+    id: 'veteran',
+    badge: 'VET',
+    name: 'Veteran',
+    short: 'VETERAN',
+    blurb: 'The fight as intended. Three ships.',
+    lives: 3,
+    missiles: 3,
+    hp: 1,
+    speed: 1,
+    layRate: 1,
+    eggSpeed: 1,
+    bossHp: 1,
+    bossRate: 1,
+    scoreMul: 1,
+  },
+  superstar: {
+    id: 'superstar',
+    badge: 'STAR',
+    name: 'Superstar',
+    short: 'SUPERSTAR',
+    blurb: 'Tougher, faster, two ships. Big points.',
+    lives: 2,
+    missiles: 2,
+    hp: 1.45,
+    speed: 1.16,
+    layRate: 1.5,
+    eggSpeed: 1.18,
+    bossHp: 1.35,
+    bossRate: 1.25,
+    scoreMul: 1.6,
+  },
+};
+
+export const DEFAULT_DIFFICULTY = 'veteran';
+
+export function difficultyMode(id) {
+  return DIFFICULTIES[id] || DIFFICULTIES[DEFAULT_DIFFICULTY];
+}
+
+/** Difficulty curve: wave number times the chosen mode's multipliers. */
+export function difficultyFor(wave, mode = DIFFICULTIES[DEFAULT_DIFFICULTY]) {
   const t = wave - 1;
   return {
-    hp: 1 + t * 0.16,
-    speed: clamp(1 + t * 0.022, 1, 1.85),
-    layRate: clamp(1 + t * 0.05, 1, 2.6),
-    eggSpeed: clamp(1 + t * 0.018, 1, 1.7),
-    bossHp: 1 + t * 0.05,
-    bossRate: clamp(1 + t * 0.02, 1, 1.7),
+    hp: (1 + t * 0.16) * mode.hp,
+    speed: clamp(1 + t * 0.022, 1, 1.85) * mode.speed,
+    layRate: clamp(1 + t * 0.05, 1, 2.6) * mode.layRate,
+    eggSpeed: clamp(1 + t * 0.018, 1, 1.7) * mode.eggSpeed,
+    bossHp: (1 + t * 0.05) * mode.bossHp,
+    bossRate: clamp(1 + t * 0.02, 1, 1.7) * mode.bossRate,
   };
 }

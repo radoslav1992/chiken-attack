@@ -275,6 +275,34 @@ export const sfx = {
     }
   },
 
+  /** Mothership klaxon. */
+  siren() {
+    if (!sfxOn()) return;
+    for (let i = 0; i < 2; i++) {
+      tone({ freq: 420, freq2: 700, type: 'sawtooth', dur: 0.32, vol: 0.16, delay: i * 0.34 });
+      tone({ freq: 210, freq2: 350, type: 'square', dur: 0.32, vol: 0.12, delay: i * 0.34 });
+    }
+  },
+
+  /** Rising whine as the cutting beam charges. */
+  beamCharge() {
+    if (!sfxOn()) return;
+    tone({ freq: 180, freq2: 1400, type: 'sawtooth', dur: 0.85, vol: 0.14 });
+    noise({ dur: 0.85, vol: 0.1, type: 'highpass', freq: 600, freq2: 4000 });
+  },
+
+  beamFire() {
+    if (!sfxOn()) return;
+    noise({ dur: 1.4, vol: 0.2, type: 'bandpass', freq: 2400, freq2: 900, q: 0.8 });
+    tone({ freq: 900, freq2: 300, type: 'sawtooth', dur: 1.2, vol: 0.12 });
+  },
+
+  bayOpen() {
+    if (!sfxOn()) return;
+    noise({ dur: 0.4, vol: 0.16, type: 'lowpass', freq: 900, freq2: 200 });
+    tone({ freq: 120, freq2: 260, type: 'square', dur: 0.3, vol: 0.12 });
+  },
+
   bossRoar() {
     if (!sfxOn()) return;
     tone({ freq: 240, freq2: 70, type: 'sawtooth', dur: 1.1, vol: 0.26 });
@@ -306,9 +334,11 @@ export const sfx = {
     tone({ freq: 500, freq2: 300, type: 'square', dur: 0.06, vol: 0.09 });
   },
 
-  countdown(i) {
+  /** Resume countdown: pitch rises as it reaches zero. */
+  countdown(n) {
     if (!sfxOn()) return;
-    tone({ freq: i === 0 ? 1046 : 523, type: 'square', dur: 0.16, vol: 0.16 });
+    const freq = n <= 1 ? 1046 : 523 + (3 - n) * 70;
+    tone({ freq, type: 'square', dur: n <= 1 ? 0.26 : 0.16, vol: 0.16 });
   },
 };
 

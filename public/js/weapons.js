@@ -7,7 +7,7 @@
  * hoarding a single gun still pays off).
  */
 
-import { TAU, rand, clamp, angleTo } from './util.js';
+import { TAU, rand, clamp, angleTo, cachedGradient } from './util.js';
 
 export const MAX_LEVEL = 9;
 
@@ -292,10 +292,13 @@ export function drawBullet(ctx, b, t) {
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(b.angle + Math.PI / 2);
-      const g = ctx.createLinearGradient(0, -len, 0, len * 0.4);
-      g.addColorStop(0, 'rgba(255,255,255,0)');
-      g.addColorStop(0.4, b.color);
-      g.addColorStop(1, 'rgba(255,255,255,0.9)');
+      const g = cachedGradient(`rail|${len.toFixed(1)}|${b.color}`, () => {
+        const grd = ctx.createLinearGradient(0, -len, 0, len * 0.4);
+        grd.addColorStop(0, 'rgba(255,255,255,0)');
+        grd.addColorStop(0.4, b.color);
+        grd.addColorStop(1, 'rgba(255,255,255,0.9)');
+        return grd;
+      });
       ctx.fillStyle = g;
       ctx.fillRect(-r * 0.5, -len, r, len * 1.2);
       ctx.globalAlpha = 0.5;
@@ -343,16 +346,24 @@ export function drawBullet(ctx, b, t) {
       break;
     }
     case 'plasma': {
+      // The pulse is applied as a scale so one cached gradient covers all sizes.
       const pulse = 1 + Math.sin(t * 22 + b.seed) * 0.12;
-      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 1.6 * pulse);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.35, b.color);
-      g.addColorStop(0.75, 'rgba(255,80,80,0.55)');
-      g.addColorStop(1, 'rgba(255,60,60,0)');
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.scale(pulse, pulse);
+      const g = cachedGradient(`plasma|${r.toFixed(1)}|${b.color}`, () => {
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.6);
+        grd.addColorStop(0, '#ffffff');
+        grd.addColorStop(0.35, b.color);
+        grd.addColorStop(0.75, 'rgba(255,80,80,0.55)');
+        grd.addColorStop(1, 'rgba(255,60,60,0)');
+        return grd;
+      });
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, r * 1.6 * pulse, 0, TAU);
+      ctx.arc(0, 0, r * 1.6, 0, TAU);
       ctx.fill();
+      ctx.restore();
       break;
     }
     case 'corn': {
@@ -374,14 +385,20 @@ export function drawBullet(ctx, b, t) {
       break;
     }
     case 'neutron': {
-      const g = ctx.createRadialGradient(b.x, b.y - r * 0.3, 0, b.x, b.y, r * 1.3);
-      g.addColorStop(0, '#fff9db');
-      g.addColorStop(0.5, b.color);
-      g.addColorStop(1, 'rgba(255,180,60,0)');
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      const g = cachedGradient(`neutron|${r.toFixed(1)}|${b.color}`, () => {
+        const grd = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r * 1.3);
+        grd.addColorStop(0, '#fff9db');
+        grd.addColorStop(0.5, b.color);
+        grd.addColorStop(1, 'rgba(255,180,60,0)');
+        return grd;
+      });
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.ellipse(b.x, b.y, r * 1.1, r * 1.4, 0, 0, TAU);
+      ctx.ellipse(0, 0, r * 1.1, r * 1.4, 0, 0, TAU);
       ctx.fill();
+      ctx.restore();
       break;
     }
     case 'vulcan':
@@ -390,20 +407,26 @@ export function drawBullet(ctx, b, t) {
       ctx.translate(b.x, b.y);
       ctx.rotate(b.angle + Math.PI / 2);
       // Soft halo so bolts read clearly against the starfield.
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 3);
-      halo.addColorStop(0, b.color);
-      halo.addColorStop(0.45, 'rgba(120,220,255,0.35)');
-      halo.addColorStop(1, 'rgba(120,220,255,0)');
+      const halo = cachedGradient(`halo|${r.toFixed(1)}|${b.color}`, () => {
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 3);
+        grd.addColorStop(0, b.color);
+        grd.addColorStop(0.45, 'rgba(120,220,255,0.35)');
+        grd.addColorStop(1, 'rgba(120,220,255,0)');
+        return grd;
+      });
       ctx.fillStyle = halo;
       ctx.beginPath();
       ctx.arc(0, 0, r * 3, 0, TAU);
       ctx.fill();
 
-      const g = ctx.createLinearGradient(0, -r * 3.4, 0, r * 1.6);
-      g.addColorStop(0, 'rgba(255,255,255,0)');
-      g.addColorStop(0.35, b.color);
-      g.addColorStop(0.7, '#ffffff');
-      g.addColorStop(1, 'rgba(120,220,255,0)');
+      const g = cachedGradient(`bolt|${r.toFixed(1)}|${b.color}`, () => {
+        const grd = ctx.createLinearGradient(0, -r * 3.4, 0, r * 1.6);
+        grd.addColorStop(0, 'rgba(255,255,255,0)');
+        grd.addColorStop(0.35, b.color);
+        grd.addColorStop(0.7, '#ffffff');
+        grd.addColorStop(1, 'rgba(120,220,255,0)');
+        return grd;
+      });
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.ellipse(0, -r * 0.9, r * 1.05, r * 2.8, 0, 0, TAU);
@@ -443,15 +466,22 @@ export function drawEnemyShot(ctx, e, art, t) {
   switch (e.kind) {
     case 'orb': {
       const pulse = 1 + Math.sin(t * 16 + e.seed) * 0.15;
-      const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 1.8 * pulse);
-      g.addColorStop(0, '#fff5cc');
-      g.addColorStop(0.4, '#ffb703');
-      g.addColorStop(0.8, 'rgba(255,120,0,0.5)');
-      g.addColorStop(1, 'rgba(255,80,0,0)');
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.scale(pulse, pulse);
+      const g = cachedGradient(`orb|${e.r.toFixed(1)}`, () => {
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, e.r * 1.8);
+        grd.addColorStop(0, '#fff5cc');
+        grd.addColorStop(0.4, '#ffb703');
+        grd.addColorStop(0.8, 'rgba(255,120,0,0.5)');
+        grd.addColorStop(1, 'rgba(255,80,0,0)');
+        return grd;
+      });
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(e.x, e.y, e.r * 1.8 * pulse, 0, TAU);
+      ctx.arc(0, 0, e.r * 1.8, 0, TAU);
       ctx.fill();
+      ctx.restore();
       break;
     }
     case 'feather':

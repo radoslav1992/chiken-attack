@@ -113,6 +113,27 @@ export function formatScore(n) {
     .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
+/*
+ * Canvas gradients are expensive to build, and the bullet/pickup painters used
+ * to allocate one per object per frame. They are cached here, keyed by shape,
+ * and always built in local (translated) coordinates so they can be reused
+ * wherever the object happens to be. Cleared on resize, when sizes change.
+ */
+const gradientCache = new Map();
+
+export function cachedGradient(key, make) {
+  let g = gradientCache.get(key);
+  if (g === undefined) {
+    g = make();
+    gradientCache.set(key, g);
+  }
+  return g;
+}
+
+export function clearGradientCache() {
+  gradientCache.clear();
+}
+
 export function roundRect(ctx, x, y, w, h, r) {
   const rr = Math.min(r, w * 0.5, h * 0.5);
   ctx.beginPath();

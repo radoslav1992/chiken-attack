@@ -334,6 +334,85 @@ function paintAsteroid(ctx, s, seed = 1, color = '#8a7f75') {
   }
 }
 
+/** Boss saucer: wide hull, glass dome with a pilot chicken silhouette, bays. */
+function paintMothership(ctx, s) {
+  const r = s * 0.5;
+
+  // Lower hull
+  const hull = ctx.createLinearGradient(0, -r * 0.1, 0, r * 0.55);
+  hull.addColorStop(0, '#e6edf6');
+  hull.addColorStop(0.45, '#93a3b8');
+  hull.addColorStop(1, '#3c4655');
+  ctx.fillStyle = hull;
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.2, r * 0.98, r * 0.34, 0, 0, TAU);
+  ctx.fill();
+
+  // Rim highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = Math.max(1, s * 0.012);
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.14, r * 0.94, r * 0.3, 0, Math.PI, TAU);
+  ctx.stroke();
+
+  // Bay hatches
+  ctx.fillStyle = 'rgba(24,32,48,0.85)';
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(sx * r * 0.58, r * 0.3, r * 0.2, r * 0.08, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  // Upper deck
+  const deck = ctx.createLinearGradient(0, -r * 0.5, 0, r * 0.1);
+  deck.addColorStop(0, '#cfd8e3');
+  deck.addColorStop(1, '#6c7a8d');
+  ctx.fillStyle = deck;
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.02, r * 0.66, r * 0.28, 0, 0, TAU);
+  ctx.fill();
+
+  // Dome
+  const dome = ctx.createRadialGradient(-r * 0.16, -r * 0.42, r * 0.04, 0, -r * 0.1, r * 0.5);
+  dome.addColorStop(0, 'rgba(255,255,255,0.95)');
+  dome.addColorStop(0.45, 'rgba(143,230,255,0.85)');
+  dome.addColorStop(1, 'rgba(38,110,160,0.9)');
+  ctx.fillStyle = dome;
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.42, r * 0.42, 0, Math.PI, TAU);
+  ctx.fill();
+
+  // Pilot chicken inside the dome
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.4, r * 0.4, 0, Math.PI, TAU);
+  ctx.clip();
+  ctx.globalAlpha = 0.9;
+  ctx.translate(0, -r * 0.12);
+  paintChicken(ctx, s * 0.34, { comb: '#e8443a', angry: true, wing: -0.2 });
+  ctx.restore();
+
+  // Dome frame
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = Math.max(1, s * 0.014);
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.42, r * 0.42, 0, Math.PI, TAU);
+  ctx.stroke();
+
+  // Beam emitter under the belly
+  const em = ctx.createRadialGradient(0, r * 0.44, 0, 0, r * 0.44, r * 0.24);
+  em.addColorStop(0, 'rgba(255,140,140,0.95)');
+  em.addColorStop(1, 'rgba(255,80,80,0)');
+  ctx.fillStyle = em;
+  ctx.beginPath();
+  ctx.arc(0, r * 0.44, r * 0.24, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#40485a';
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.42, r * 0.14, r * 0.08, 0, 0, TAU);
+  ctx.fill();
+}
+
 function paintMissileIcon(ctx, s) {
   const r = s * 0.5;
   ctx.fillStyle = '#e8e8f0';
@@ -462,6 +541,7 @@ export class Art {
     c.giftLife = sprite(S(26), (g, s) => paintGift(g, s, '#f783ac', '#fff0f6'));
     c.missile = sprite(S(20), (g, s) => paintMissileIcon(g, s));
     c.ufo = sprite(S(46), (g, s) => paintUfo(g, s));
+    c.mothership = sprite(S(140), (g, s) => paintMothership(g, s));
     c.asteroid = [0, 1, 2].map((i) => sprite(S(46), (g, s) => paintAsteroid(g, s, i + 1)));
     c.asteroidSmall = [0, 1, 2].map((i) => sprite(S(24), (g, s) => paintAsteroid(g, s, i + 3, '#6f665e')));
     c.feather = [0, 1].map((i) =>

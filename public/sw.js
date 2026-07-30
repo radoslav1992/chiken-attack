@@ -4,7 +4,7 @@
  * cache-first with a background refresh.
  */
 
-const VERSION = 'chicken-attack-v2';
+const VERSION = 'chicken-attack-v3';
 
 /*
  * './' is the canonical app shell URL. Hosts that normalise /index.html to /

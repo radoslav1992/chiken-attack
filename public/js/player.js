@@ -27,14 +27,23 @@ export class Player {
     this.hitFlash = 0;
 
     if (full) {
-      this.lives = 3;
+      const mode = this.game.mode;
+      this.lives = mode.lives;
       this.weapon = WEAPONS[0];
       this.level = 0;
-      this.missiles = 3;
+      this.missiles = mode.missiles;
       this.food = 0;
       this.shield = 0;
-      this.overheat = 0;
     }
+  }
+
+  /** Restore a loadout from an autosaved run. */
+  restore(run) {
+    this.lives = Math.max(1, run.lives | 0);
+    this.weapon = WEAPON_BY_ID[run.weapon] || WEAPONS[0];
+    this.level = clamp(run.level | 0, 0, MAX_LEVEL);
+    this.missiles = clamp(run.missiles | 0, 0, 15);
+    this.food = clamp(run.food | 0, 0, 99);
   }
 
   get spriteKey() {
