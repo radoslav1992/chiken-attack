@@ -90,6 +90,8 @@ installed clients pick the new bundle up on their next visit.
   difficulty multipliers.
 - Drumstick economy: 100 drumsticks earn an extra life. Combo multiplier up to ×5, wave-clear
   bonuses for accuracy and remaining lives, top-10 local table with name entry and lifetime stats.
+- Timed power-ups (see below) drop alongside the permanent upgrades. Buffs are deliberately not
+  part of the autosave — a resumed run restarts the wave without them.
 
 **Combat**
 
@@ -109,6 +111,20 @@ installed clients pick the new bundle up on their next visit.
   always drop a gift.
 - Every seventh non-boss wave is a **feast**: drumsticks and gifts rain down, nothing shoots back.
 - Gifts: weapon swap, +power, missiles, shield and extra life.
+
+**Power-ups**
+
+Timed boosts drop as labelled gift boxes and show a countdown ring in the HUD (glyph, plus the
+seconds remaining once under ten). Collecting one you already have refreshes its timer.
+
+| Power-up | Effect | Duration |
+| --- | --- | --- |
+| Wing Drones | Two escort drones fire your current weapon, a little slower and one power level down | 22 s |
+| Overdrive | Weapon cooldown cut to 55% — measured at ~1.7x the shot rate | 12 s |
+| Drumstick Magnet | Food and gifts home in from across the screen | 16 s |
+| Golden Egg | Doubles every point scored, on top of the combo and difficulty multipliers | 20 s |
+| Time Warp | Chickens, eggs and formations run at 45% speed; your ship and bullets do not | 9 s |
+| Pressure Cooker | Instant: scrambles every egg in flight and damages everything on screen (bosses take 55%) | — |
 
 **Bosses**
 
@@ -154,6 +170,7 @@ public/                    the deployable site — nothing else is uploaded
   js/enemies.js            chickens, asteroids, UFOs, bosses
   js/waves.js              formations, wave archetypes, difficulty curve
   js/weapons.js            weapon table + projectile rendering
+  js/powerups.js           timed power-up table and tuning constants
   js/effects.js            pooled particles, shockwaves, floating text
   js/hud.js                in-canvas HUD, boss bar, banners
   js/art.js                procedural sprite pre-rendering + starfield

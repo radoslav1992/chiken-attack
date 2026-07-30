@@ -295,7 +295,8 @@ export class Chicken extends Enemy {
     } else if (chance(this.foodChance)) {
       g.spawnPickup(this.x, this.y, 'food');
     }
-    if (chance(0.035)) g.spawnPickup(this.x, this.y, g.rollGift());
+    // Slightly more gifts than before, since the table now includes power-ups.
+    if (chance(0.05)) g.spawnPickup(this.x, this.y, g.rollGift());
   }
 
   draw(ctx, art, t) {

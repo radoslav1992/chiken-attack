@@ -15,6 +15,9 @@ import { WEAPONS, drawBullet, drawMissile, drawEnemyShot, nearestEnemy } from '.
 import { sfx, music, vibrate, unlock as unlockAudio } from './audio.js';
 import { settings, submitScore, highScore, saveRun, loadRun, clearRun } from './storage.js';
 import { drawHud, drawBanner, drawBossBar } from './hud.js';
+import {
+  POWERUPS, isPowerup, MAGNET_RANGE, WARP_FACTOR, NUKE_DAMAGE, NUKE_DAMAGE_PER_WAVE,
+} from './powerups.js';
 
 const GIFTS = ['weapon', 'power', 'missile', 'shield', 'life'];
 
@@ -369,14 +372,24 @@ export class Game {
     });
   }
 
+  /**
+   * Weighted gift table. Permanent upgrades stay the most common; the timed
+   * power-ups fill the rest, with the screen-clearing nuke as the rare prize.
+   */
   rollGift(favourWeapon = false) {
-    if (favourWeapon && chance(0.55)) return 'weapon';
+    if (favourWeapon && chance(0.5)) return 'weapon';
     const r = Math.random();
-    if (r < 0.36) return 'weapon';
-    if (r < 0.6) return 'power';
-    if (r < 0.78) return 'missile';
-    if (r < 0.93) return 'shield';
-    return 'life';
+    if (r < 0.26) return 'weapon';
+    if (r < 0.42) return 'power';
+    if (r < 0.53) return 'missile';
+    if (r < 0.61) return 'shield';
+    if (r < 0.65) return 'life';
+    if (r < 0.73) return 'drones';
+    if (r < 0.81) return 'overdrive';
+    if (r < 0.87) return 'magnet';
+    if (r < 0.93) return 'double';
+    if (r < 0.97) return 'warp';
+    return 'nuke';
   }
 
   spawnPickup(x, y, type) {
@@ -518,8 +531,12 @@ export class Game {
 
   updateWorld(dt, live) {
     const p = this.player;
+    // Time warp slows everything hostile — enemies, their shots and the
+    // formation drift — while the ship and its bullets stay at full speed.
+    const warped = p && !p.dead && p.hasBuff('warp');
+    const edt = warped ? dt * WARP_FACTOR : dt;
     this.stars.update(dt, this.state === 'playing' ? 1 : 0.6);
-    this.formation.update(dt);
+    this.formation.update(edt);
     this.shakeAmount *= Math.pow(0.0015, dt);
     this.flashAlpha = Math.max(0, this.flashAlpha - dt * 3.2);
 
@@ -531,7 +548,7 @@ export class Game {
       }
     }
 
-    if (live && this.wave) this.wave.update(dt);
+    if (live && this.wave) this.wave.update(edt);
 
     if (p && !p.dead) p.update(dt, this.input);
 
@@ -539,7 +556,7 @@ export class Game {
     const list = this.enemies.active;
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
-      e.update(dt);
+      e.update(edt);
       if (e.dead) {
         if (e === this.boss) this.boss = null;
         list.splice(i, 1);
@@ -548,7 +565,7 @@ export class Game {
 
     this.updateBullets(dt);
     this.updateMissiles(dt);
-    this.updateEnemyShots(dt);
+    this.updateEnemyShots(edt);
     this.updatePickups(dt);
 
     for (let i = this.arcs.length - 1; i >= 0; i--) {
@@ -763,10 +780,11 @@ export class Game {
       // Gentle magnetism so drumsticks feel collectable on a small screen.
       if (p && !p.dead) {
         const d = dist(k.x, k.y, p.x, p.y);
-        const range = k.homing ? Infinity : 110 * u;
+        const magnet = p.hasBuff('magnet');
+        const range = k.homing ? Infinity : (magnet ? MAGNET_RANGE : 110) * u;
         if (d < range) {
           const a = angleTo(k.x, k.y, p.x, p.y);
-          const pull = k.homing ? 900 * u * dt : (1 - d / range) * 620 * u * dt;
+          const pull = k.homing || magnet ? 900 * u * dt : (1 - d / range) * 620 * u * dt;
           k.vx += Math.cos(a) * pull;
           k.vy += Math.sin(a) * pull;
         }
@@ -824,6 +842,11 @@ export class Game {
       case 'life':
         p.addLife();
         break;
+      case 'nuke':
+        this.detonateNuke();
+        break;
+      default:
+        if (isPowerup(k.type)) p.addBuff(k.type);
     }
     this.emit('hud', this.snapshot());
   }
@@ -831,6 +854,8 @@ export class Game {
   /* ------------------------------------------------------------ score/juice -- */
 
   addScore(n, x, y) {
+    const p = this.player;
+    if (p && p.hasBuff('double')) n *= 2;
     n = Math.round(n * this.mode.scoreMul);
     this.score += n;
     if (x != null && n >= 100) this.fx.text(`+${n}`, x, y, '#ffe066', 12, 0.75);
@@ -858,6 +883,35 @@ export class Game {
         this.timeScale = 1;
       }, 700);
     }
+  }
+
+  /** Instant power-up: scours the screen and wipes incoming fire. */
+  detonateNuke() {
+    const dmg = NUKE_DAMAGE + this.waveNum * NUKE_DAMAGE_PER_WAVE;
+    const cx = this.w * 0.5;
+    const cy = this.h * 0.45;
+    sfx.nuke();
+    this.flash('rgba(255,240,220,0.9)');
+    this.shake(16);
+    vibrate([40, 30, 80]);
+    this.fx.shockwave(cx, cy, Math.max(this.w, this.h), 'rgba(255,230,180,0.95)', 0.8, 8);
+    this.fx.shockwave(cx, cy, Math.max(this.w, this.h) * 0.6, 'rgba(255,140,120,0.9)', 0.55, 6);
+
+    // Every egg in flight is scrambled.
+    this.enemyShots.forEach((e) => {
+      this.fx.splat(e.x, e.y, '#fff8e1');
+      e.dead = true;
+    });
+    this.enemyShots.sweep();
+
+    // Damage everything on screen, bosses included (they take a fraction).
+    const targets = this.enemies.active.slice();
+    for (const e of targets) {
+      if (e.y < -e.r) continue;
+      this.fx.explosion(e.x, e.y, 0.6, '#ffd8a8');
+      e.hurt(e.isBoss ? dmg * 0.55 : dmg, 'nuke');
+    }
+    this.emit('hud', this.snapshot());
   }
 
   shake(amount) {
@@ -1096,31 +1150,30 @@ export class Game {
     const art = this.art;
     const bob = Math.sin(this.time * 6 + k.x * 0.05) * 2 * this.unit;
     const fade = k.life > k.maxLife - 3 ? 0.35 + 0.65 * Math.abs(Math.sin(this.time * 12)) : 1;
-    const key =
-      k.type === 'food'
-        ? 'drumstick'
-        : k.type === 'weapon'
-          ? 'giftWeapon'
-          : k.type === 'power'
-            ? 'giftPower'
-            : k.type === 'missile'
-              ? 'giftMissile'
-              : k.type === 'shield'
-                ? 'giftShield'
-                : 'giftLife';
+    const STATIC_KEYS = {
+      food: 'drumstick',
+      weapon: 'giftWeapon',
+      power: 'giftPower',
+      missile: 'giftMissile',
+      shield: 'giftShield',
+      life: 'giftLife',
+    };
+    const key = STATIC_KEYS[k.type] || `gift_${k.type}`;
 
     ctx.save();
     ctx.globalAlpha = fade;
     // Glow so pickups read against the starfield.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const glowColor =
-      k.type === 'food' ? 'rgba(255,190,110,0.5)'
-        : k.type === 'weapon' ? 'rgba(255,110,140,0.5)'
-          : k.type === 'power' ? 'rgba(110,240,150,0.5)'
-            : k.type === 'missile' ? 'rgba(130,160,255,0.5)'
-              : k.type === 'shield' ? 'rgba(110,230,240,0.5)'
-                : 'rgba(255,170,200,0.5)';
+    const STATIC_GLOW = {
+      food: 'rgba(255,190,110,0.5)',
+      weapon: 'rgba(255,110,140,0.5)',
+      power: 'rgba(110,240,150,0.5)',
+      missile: 'rgba(130,160,255,0.5)',
+      shield: 'rgba(110,230,240,0.5)',
+      life: 'rgba(255,170,200,0.5)',
+    };
+    const glowColor = STATIC_GLOW[k.type] || `${POWERUPS[k.type].color}90`;
     ctx.translate(k.x, k.y + bob);
     const g = cachedGradient(`pickup|${k.type}|${k.r.toFixed(1)}`, () => {
       const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, k.r * 2.1);
@@ -1136,19 +1189,28 @@ export class Game {
 
     art.draw(ctx, key, k.x, k.y + bob, k.rot, 1);
 
-    // Weapon gifts show which gun they carry.
+    // Gift boxes are labelled so players learn what each one does.
+    let label = null;
+    let labelColor = '#fff';
     if (k.type === 'weapon') {
       const wpn = WEAPONS.find((w) => w.id === k.weaponId);
       if (wpn) {
-        ctx.font = `900 ${Math.round(8.5 * this.unit)}px "Baloo 2", system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.lineWidth = 2.5 * this.unit;
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.strokeText(wpn.short, k.x, k.y + bob + k.r * 1.55);
-        ctx.fillStyle = wpn.color;
-        ctx.fillText(wpn.short, k.x, k.y + bob + k.r * 1.55);
+        label = wpn.short;
+        labelColor = wpn.color;
       }
+    } else if (POWERUPS[k.type]) {
+      label = POWERUPS[k.type].short;
+      labelColor = POWERUPS[k.type].color;
+    }
+    if (label) {
+      ctx.font = `900 ${Math.round(8.5 * this.unit)}px "Baloo 2", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2.5 * this.unit;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(label, k.x, k.y + bob + k.r * 1.55);
+      ctx.fillStyle = labelColor;
+      ctx.fillText(label, k.x, k.y + bob + k.r * 1.55);
     }
     ctx.restore();
   }

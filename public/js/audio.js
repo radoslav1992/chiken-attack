@@ -249,6 +249,62 @@ export const sfx = {
     );
   },
 
+  /** Distinct sting per power-up so they're identifiable without looking. */
+  buff(id) {
+    if (!sfxOn()) return;
+    switch (id) {
+      case 'drones':
+        [392, 523, 659].forEach((f, i) =>
+          tone({ freq: f, type: 'triangle', dur: 0.16, vol: 0.13, delay: i * 0.06 })
+        );
+        tone({ freq: 180, freq2: 520, type: 'sawtooth', dur: 0.3, vol: 0.1, delay: 0.1 });
+        break;
+      case 'overdrive':
+        tone({ freq: 300, freq2: 1500, type: 'square', dur: 0.3, vol: 0.14 });
+        noise({ dur: 0.3, vol: 0.1, type: 'highpass', freq: 900, freq2: 3600 });
+        break;
+      case 'magnet':
+        tone({ freq: 1200, freq2: 320, type: 'sine', dur: 0.35, vol: 0.14 });
+        tone({ freq: 600, freq2: 160, type: 'triangle', dur: 0.4, vol: 0.1, delay: 0.05 });
+        break;
+      case 'double':
+        [659, 880, 1047, 1319].forEach((f, i) =>
+          tone({ freq: f, type: 'square', dur: 0.14, vol: 0.13, delay: i * 0.05 })
+        );
+        break;
+      case 'warp':
+        tone({ freq: 900, freq2: 120, type: 'sine', dur: 0.7, vol: 0.16 });
+        noise({ dur: 0.7, vol: 0.1, type: 'lowpass', freq: 2200, freq2: 200 });
+        break;
+      default:
+        this.powerup();
+    }
+  },
+
+  /** Three quiet blips as a buff nears its end. */
+  buffWarn() {
+    if (!sfxOn()) return;
+    for (let i = 0; i < 3; i++) {
+      tone({ freq: 880, type: 'square', dur: 0.06, vol: 0.07, delay: i * 0.12 });
+    }
+  },
+
+  buffEnd() {
+    if (!sfxOn()) return;
+    tone({ freq: 520, freq2: 240, type: 'triangle', dur: 0.22, vol: 0.1 });
+  },
+
+  /** Pressure-cooker detonation. */
+  nuke() {
+    if (!sfxOn()) return;
+    noise({ dur: 1.6, vol: 0.34, type: 'lowpass', freq: 3000, freq2: 40 });
+    tone({ freq: 70, freq2: 20, type: 'triangle', dur: 1.6, vol: 0.3 });
+    tone({ freq: 1600, freq2: 200, type: 'sawtooth', dur: 0.7, vol: 0.14 });
+    for (let i = 0; i < 3; i++) {
+      noise({ dur: 0.7, vol: 0.16, freq: 1200, freq2: 60, delay: 0.15 + i * 0.12 });
+    }
+  },
+
   weaponSwap() {
     if (!sfxOn()) return;
     [392, 523, 659, 880, 1047].forEach((f, i) =>

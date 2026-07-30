@@ -432,6 +432,24 @@ body {
 .c-life {
   color: #ffa8c5;
 }
+.c-drones {
+  color: #a5d8ff;
+}
+.c-rapid {
+  color: #ffd166;
+}
+.c-magnet {
+  color: #ff8787;
+}
+.c-double {
+  color: #ffe066;
+}
+.c-warp {
+  color: #c792ff;
+}
+.c-nuke {
+  color: #ff6b6b;
+}
 
 /* ------------------------------------------------------------------ toggles */
 
