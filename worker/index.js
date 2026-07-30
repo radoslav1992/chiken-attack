@@ -14,9 +14,15 @@
  * lists and writes 503 — the site keeps working without the board.
  */
 
-// Slugs must match src/data/games.js; kept inline so the Worker has no
-// build-time dependency on the Astro source tree.
-const KNOWN_GAMES = new Set(['chicken-attack', 'beaver-dash', 'orbit-cadet']);
+/* Straight from the arcade's own list rather than a copy of it. The copy was
+ * "kept inline so the Worker has no build-time dependency on the Astro source
+ * tree", which sounded tidy right up until a fourth game shipped: the game
+ * worked, the leaderboard silently 400'd, and nothing in the client said why.
+ * Wrangler bundles the Worker, so importing a plain data module costs nothing
+ * and the two lists can no longer disagree. */
+import { GAME_SLUGS } from '../src/data/games.js';
+
+const KNOWN_GAMES = new Set(GAME_SLUGS);
 
 const MAX_SCORE = 100_000_000;
 const MAX_WAVE = 10_000;

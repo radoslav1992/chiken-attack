@@ -19,7 +19,12 @@ Three cabinets are open:
   climb. Two thumbs, two flippers: arm a mission at the rollover, finish it, and get promoted from
   Cadet to Admiral. Plunger, nudge, tilt, drop-target bank, orbit loop, spinner, multiball.
 
-All three are fully playable offline and every pixel and sound in them is generated procedurally at
+- **Whittle & Wares** (`/whittle-wares/`, page at `/games/whittle-wares/`) — a pixel shopkeeper RPG
+  with a tycoon loop bolted to it. Forage the wood each morning for materials, craft what your bench
+  allows, then price the shelves and face the customers. Thirty days, rent every fifth one, and it
+  never gets smaller. Saves between days.
+
+All four are fully playable offline and every pixel and sound in them is generated procedurally at
 runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
 
 ## Stack
@@ -98,6 +103,7 @@ public/
   chicken-attack/           game — self-contained PWA, unchanged by the site build
   beaver-dash/              game — same shape, own service worker + icons
   orbit-cadet/              game — pinball; physics.js and table.js are pure modules
+  whittle-wares/            game — shopkeeper RPG; economy.js and world.js are pure modules
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
   media/                    cabinet/stage art (captured from real gameplay)
   sw.js                     self-destruct stub migrating pre-Astro installs
@@ -105,7 +111,8 @@ public/
 wrangler.jsonc              Workers config: assets + Worker + D1
 tools/make-icons.mjs        Chicken Attack icon set
 tools/make-beaver-icons.mjs Beaver Dash icon set
-tools/make-orbit-icons.mjs  Orbit Cadet icon set   (npm run icons runs all three)
+tools/make-orbit-icons.mjs  Orbit Cadet icon set
+tools/make-whittle-icons.mjs Whittle & Wares icon set  (npm run icons runs all four)
 ```
 
 ## The brand mark
@@ -308,3 +315,60 @@ channels, chevrons, decals, chrome rails — is baked once into an offscreen can
 pixel density and blitted with a single `drawImage`; only what animates is drawn per frame. That is
 what pays for artwork this dense: measured at 412x900 on a 2x display, the bake is 0.8 ms once per
 resize and the p95 frame draw is 0.4 ms against a 16.7 ms budget.
+
+## Whittle & Wares (the game)
+
+| Action | Touch | Keyboard |
+| --- | --- | --- |
+| Walk | drag anywhere in the wood | arrows or WASD |
+| Gather | stand on a plant — there is no button | — |
+| Go home | walk back to the shop door | — |
+| Pause | pause button | P / Esc |
+
+Thirty days to make a lease pay. Mornings are a top-down forage: stamina is the whole budget and it
+goes on walking as well as gathering, so a deep run costs you the shallow one. Evenings are the
+shop: two goods are wanted each day and one is glutted, you set a price for everything on the shelf,
+and customers who think you are dear will haggle exactly once. Rent falls every fifth day and grows
+faster than standing still can pay for. The score on the board is what you took over the run; the
+`wave` column is the day you reached.
+
+### The economy is simulated, not tuned by feel
+
+`economy.js` and `world.js` are pure modules — no `window`, no `document`, and crucially no
+`Math.random`: every draw comes from a seeded generator passed in. That is not tidiness, it is what
+makes the balance answerable. `ww-balance.mjs` plays all thirty days three hundred times as each of
+four different shopkeepers and asks the three questions a tycoon loop lives or dies on:
+
+- **Can a careless player lose?** A shopkeeper who forages daily and never opens up dies at the first
+  rent, every time. If they survived, the rent would not be a clock.
+- **Can a careful player win?** Yes, at around 97%.
+- **Is any one good the whole game?** The first answer was no: amber was 53% of all revenue and five
+  goods — bark, berries, resin, baskets, charms — earned literally nothing, because the deepest open
+  band was simply the right answer every morning. Bands now hold a finite number of nodes, so a deep
+  run ends early and you gather your way home. The top good is now 18%.
+
+Two things that came out of measuring rather than playing. First, **the price dial**: `smart` (a
+modest margin) and `naive` (pricing at cost) landed within a few hundred coin of each other, which
+tells you nothing — two points can be either side of a peak or both on a plateau. Sweeping the markup
+from ×0.8 to ×2.0 showed the shape: a peak at ×1.1, viable from ×0.8 to ×1.3, dead from ×1.4. Both
+generous and shrewd pricing work, and gouging does not.
+
+Second, **the cliff**. That sweep originally went 94% survival at ×1.2 → 19% at ×1.3 → 0% at ×1.4,
+and every death was the same spiral: walkouts cost reputation, reputation cost footfall, less
+footfall meant fewer sales. Reputation is now asymmetric — good standing brings people in about
+twice as fast as bad standing drives them away — so a bad week hurts without being unrecoverable.
+
+### Every map is checked, not sampled
+
+The wood is generated fresh each morning, and a player who walks three bands north to find the last
+node sealed behind a rock does not experience an unlucky map, they experience a broken game. The
+trail is carved first and the scenery placed around it; then the result is flood-filled and any node
+that ended up stranded is moved. `ww-world.mjs` generates 1,800 maps — every day of thirty, across
+sixty seeds — and asserts that all 52,200 nodes are reachable on foot, that every band has nodes in
+it, and that no gated band is ever walkable without its tool.
+
+The browser test drives the game through its real buttons, and its bot pathfinds rather than walking
+at the target: the first version aimed straight at the nearest node, passed on one map and hung on
+the next, which is the signature of a test measuring luck. Pathfinding also checks something the
+tile-level flood fill cannot — the flood fill proves a route exists for a *point*, and the bot proves
+a body ten pixels wide can actually get down it.
