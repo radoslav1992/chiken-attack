@@ -30,15 +30,16 @@ npm run dev                  # astro build + wrangler dev → http://localhost:8
 
 ## Deploy
 
-One-time setup:
+The production D1 database (`beaver-games`) already exists and its id is committed in
+`wrangler.jsonc`; the schema was applied through the dashboard console. From a fresh clone:
 
 ```bash
 npx wrangler login
-npx wrangler d1 create beaver-games      # prints a database_id
-# paste that id into wrangler.jsonc → d1_databases[0].database_id
-npm run db:migrate:remote                # create tables in production
 npm run deploy                           # astro build + wrangler deploy
 ```
+
+(`npm run db:migrate:remote` re-applies `migrations/` — safe to run any time, every statement is
+`IF NOT EXISTS`.)
 
 After that, `npm run deploy` is the whole release. CI (`.github/workflows/deploy-cloudflare.yml`)
 does the same on pushes to `main` once `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets

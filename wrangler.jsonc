@@ -2,8 +2,7 @@
   // Beaver Games: an Astro-built static site plus a small API Worker.
   //
   //   npm install                     # once
-  //   npx wrangler d1 create beaver-games   # once — paste database_id below
-  //   npm run db:migrate:local        # create tables for local dev
+  //   npm run db:migrate:local        # once: create tables for local dev
   //   npm run dev                     # build + wrangler dev (site + API + local D1)
   //   npm run db:migrate:remote       # once per new migration, before deploy
   //   npm run deploy                  # astro build + wrangler deploy
@@ -29,9 +28,7 @@
     {
       "binding": "DB",
       "database_name": "beaver-games",
-      // Placeholder: run `npx wrangler d1 create beaver-games` and paste the
-      // real id here before the first remote deploy. Local dev ignores it.
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "69f8a829-5892-4552-8367-d606e6a46695"
     }
   ],
   "observability": {
