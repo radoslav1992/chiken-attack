@@ -1552,6 +1552,28 @@ a.game-card:hover {
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
 }
 
+/* Sizes are classes, not inline styles: `style-src 'self'` refuses a style
+   attribute outright. The logo is square with its wordmark inside it, so height
+   is what makes the lettering legible — it cannot be shrunk the way a separate
+   mark could. */
+.brand-logo-header {
+  height: 64px;
+}
+
+.brand-logo-footer {
+  height: 96px;
+}
+
+@media (max-width: 620px) {
+  .brand-logo-header {
+    height: 46px;
+  }
+
+  .brand-logo-footer {
+    height: 76px;
+  }
+}
+
 .brand-fallback {
   display: inline-flex;
   align-items: center;
