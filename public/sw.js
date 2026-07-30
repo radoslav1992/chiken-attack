@@ -1,10 +1,11 @@
 /*
  * Service worker: precache the whole app shell (it is only a handful of text
- * files plus icons) so the game is fully playable offline, then serve
- * cache-first with a background refresh.
+ * files plus icons) so the game is fully playable offline. Navigations, scripts
+ * and styles are network-first so an online page always runs one deploy's worth
+ * of files; icons and the manifest stay cache-first with background refresh.
  */
 
-const VERSION = 'chicken-attack-v4';
+const VERSION = 'chicken-attack-v5';
 
 /*
  * './' is the canonical app shell URL. Hosts that normalise /index.html to /
@@ -84,6 +85,30 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  /*
+   * Scripts and styles are network-first. Cache-first served a page whose HTML
+   * (network-first) was newer than its JS/CSS (stale until the next visit), so
+   * the first load after a deploy ran old code against new markup — freshly
+   * added UI rendered but nothing wired it up. Online, everything now comes
+   * from one version; offline falls back to the atomic precache.
+   */
+  const critical = request.destination === 'script' || request.destination === 'style';
+  if (critical) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(VERSION).then((c) => c.put(request, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request).then((r) => r || Response.error()))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest): cache-first with background refresh.
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)

@@ -345,7 +345,14 @@ body {
 .difficulty-options button[aria-pressed="true"] {
   background: linear-gradient(180deg, #ffe9a8, #ffc046);
   color: #2b1a05;
-  border-color: transparent;
+  border-color: #fff3bf;
+  box-shadow: 0 0 0 2px rgba(255, 224, 102, 0.45), 0 3px 0 #a15a1d;
+}
+
+/* Checkmark so the pick reads even where colour is ambiguous. */
+.difficulty-options button[aria-pressed="true"]::before {
+  content: "✓ ";
+  font-weight: 900;
 }
 
 .difficulty-blurb {
