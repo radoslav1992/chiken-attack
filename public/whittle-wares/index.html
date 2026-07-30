@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Whittle &amp; Wares — forage by day, haggle by evening</title>
+    <meta
+      name="description"
+      content="A pixel shopkeeper RPG. Forage the wood each morning, craft what you can, then set your prices and face the customers. The rent falls every fifth day and it never gets smaller."
+    />
+    <meta name="theme-color" content="#141c16" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Whittle &amp; Wares" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="The wood" role="img"></canvas>
+
+    <div id="app">
+      <!-- ------------------------------------------------------------- HUD -->
+      <div id="hud" class="hud is-hidden">
+        <div class="hud-row">
+          <span class="hud-day" id="hud-day">Day 1</span>
+          <span class="hud-gold"><b id="hud-gold">60</b> coin</span>
+          <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause">❚❚</button>
+        </div>
+        <div class="hud-row hud-row-2">
+          <div class="bar" role="img" aria-label="Stamina">
+            <div class="bar-fill" id="bar-stamina"></div>
+          </div>
+          <span class="hud-sack" id="hud-sack">0 in the satchel</span>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------ menu -->
+      <section id="screen-menu" class="screen">
+        <div class="panel panel-title">
+          <h1 class="title">Whittle <span class="amp">&amp;</span> Wares</h1>
+          <p class="tagline">Forage by day. Haggle by evening. The rent is due on the fifth.</p>
+          <p class="best" id="menu-best">No shop yet</p>
+          <div class="row">
+            <button id="btn-continue" class="btn btn-ghost is-hidden" type="button">Continue</button>
+            <button id="btn-start" class="btn btn-primary" type="button">Open the shop</button>
+          </div>
+          <button id="btn-sound" class="btn btn-quiet" type="button">♪ Sound on</button>
+          <details class="how">
+            <summary>How it works</summary>
+            <ul>
+              <li><b>Morning.</b> Drag anywhere to walk. Stand on a plant to gather it. Walking and gathering both cost stamina.</li>
+              <li><b>Home.</b> Walk back to the door when you are done — or run out of stamina and be carried.</li>
+              <li><b>Evening.</b> Set a price for everything on the shelf, then open up. Two goods are wanted each day and one is not.</li>
+              <li><b>The fifth day.</b> Rent, and it grows. Standing still is losing slowly.</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------- craft -->
+      <section id="screen-craft" class="screen is-hidden">
+        <div class="panel">
+          <h2 class="panel-h">The workbench</h2>
+          <p class="panel-sub" id="craft-sub">Turn materials into goods worth more than their parts.</p>
+          <ul class="list" id="craft-list"></ul>
+          <button id="btn-craft-done" class="btn btn-primary" type="button">Open the shop</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ shop -->
+      <section id="screen-shop" class="screen is-hidden">
+        <div class="panel">
+          <h2 class="panel-h">Set your prices</h2>
+          <p class="panel-sub" id="shop-market"></p>
+          <ul class="list list-price" id="price-list"></ul>
+          <p class="panel-note" id="shop-note"></p>
+          <button id="btn-open" class="btn btn-primary" type="button">Open up</button>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------- serving -->
+      <section id="screen-serving" class="screen is-hidden">
+        <div class="panel panel-counter">
+          <h2 class="panel-h">At the counter</h2>
+          <div class="counter">
+            <canvas id="face" width="64" height="64" class="face" aria-hidden="true"></canvas>
+            <div class="counter-text">
+              <p class="cust-name" id="cust-name">—</p>
+              <p class="cust-line" id="cust-line"></p>
+            </div>
+          </div>
+          <p class="cust-verdict" id="cust-verdict"></p>
+          <div class="row row-haggle is-hidden" id="haggle-row">
+            <button id="btn-hold" class="btn btn-ghost" type="button">Hold my price</button>
+            <button id="btn-accept" class="btn btn-primary" type="button">Take the offer</button>
+          </div>
+          <p class="panel-note" id="serve-tally"></p>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------- evening -->
+      <section id="screen-evening" class="screen is-hidden">
+        <div class="panel">
+          <h2 class="panel-h" id="evening-h">The day's takings</h2>
+          <ul class="tally" id="evening-tally"></ul>
+          <h3 class="panel-h3">Spend it</h3>
+          <ul class="list list-buy" id="upgrade-list"></ul>
+          <p class="panel-note rent" id="rent-note"></p>
+          <button id="btn-sleep" class="btn btn-primary" type="button">Turn in for the night</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ over -->
+      <section id="screen-over" class="screen is-hidden">
+        <div class="panel">
+          <h2 class="panel-h" id="over-title">Shop closed</h2>
+          <p class="panel-sub" id="over-reason"></p>
+          <ul class="tally">
+            <li><span>Taken over the run</span><b id="over-score">0</b></li>
+            <li><span>Days kept open</span><b id="over-days">0</b></li>
+            <li><span>Goods sold</span><b id="over-sold">0</b></li>
+            <li><span>Best run</span><b id="over-best">0</b></li>
+          </ul>
+          <form id="name-form" class="name-form" autocomplete="off">
+            <label class="name-label" for="name-input">Sign the ledger</label>
+            <div class="row">
+              <input id="name-input" class="name-input" maxlength="12" value="TRADER" />
+              <button id="btn-save-name" class="btn btn-ghost" type="submit">Save</button>
+            </div>
+          </form>
+          <button id="btn-again" class="btn btn-primary" type="button">Take another lease</button>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------- pause -->
+      <section id="screen-pause" class="screen is-hidden">
+        <div class="panel">
+          <h2 class="panel-h">Paused</h2>
+          <button id="btn-resume" class="btn btn-primary" type="button">Back to it</button>
+          <button id="btn-sound-2" class="btn btn-quiet" type="button">♪ Sound on</button>
+          <button id="btn-quit" class="btn btn-ghost" type="button">Give up the lease</button>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
