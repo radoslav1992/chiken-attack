@@ -6,11 +6,11 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "astro build && wrangler dev",
+    "dev": "wrangler dev",
     "dev:ui": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler deploy",
+    "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "tail": "wrangler tail",

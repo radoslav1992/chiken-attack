@@ -23,8 +23,12 @@ Everything in it is generated procedurally at runtime (Canvas2D + Web Audio).
 ```bash
 npm install
 npm run db:migrate:local     # once: create tables in the local D1 (miniflare)
-npm run dev                  # astro build + wrangler dev → http://localhost:8787
+npm run dev                  # wrangler dev → http://localhost:8787 (builds the site first)
 ```
+
+`wrangler.jsonc` declares `build.command = "npm run build"`, so any bare `wrangler deploy` or
+`wrangler dev` — locally, in GitHub Actions, or in Cloudflare's git integration — builds the Astro
+site before it runs. A deploy can never ship a stale or missing `dist/`.
 
 `npm run dev:ui` runs the Astro dev server alone (fast page iteration, no API/games).
 
@@ -35,7 +39,7 @@ The production D1 database (`beaver-games`) already exists and its id is committ
 
 ```bash
 npx wrangler login
-npm run deploy                           # astro build + wrangler deploy
+npm run deploy
 ```
 
 (`npm run db:migrate:remote` re-applies `migrations/` — safe to run any time, every statement is

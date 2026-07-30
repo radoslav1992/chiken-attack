@@ -13,6 +13,13 @@
   "name": "chicken-attack",
   "main": "worker/index.js",
   "compatibility_date": "2026-07-01",
+  // Wrangler runs this before every deploy/dev, so a bare `wrangler deploy`
+  // works anywhere — including Cloudflare's git integration, which otherwise
+  // deploys without building and fails on the missing dist/ directory.
+  "build": {
+    "command": "npm run build",
+    "watch_dir": "src"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
