@@ -32,6 +32,9 @@
 /beaver-dash/sw.js
   Cache-Control: no-cache, must-revalidate
 
+/orbit-cadet/sw.js
+  Cache-Control: no-cache, must-revalidate
+
 /
   Cache-Control: no-cache, must-revalidate
 
@@ -80,4 +83,23 @@
   Cache-Control: public, max-age=0, must-revalidate
 
 /beaver-dash/icons/*
+  Cache-Control: public, max-age=604800
+
+# Orbit Cadet
+/orbit-cadet/
+  Cache-Control: no-cache, must-revalidate
+
+/orbit-cadet/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/orbit-cadet/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/orbit-cadet/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/orbit-cadet/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/orbit-cadet/icons/*
   Cache-Control: public, max-age=604800

@@ -1,0 +1,540 @@
+/* Orbit Cadet — shell around the canvas, in the Beaver Games palette. */
+
+:root {
+  --bg: #0b0913;
+  --raise: #1b1830;
+  --line: #2b2646;
+  --line-mid: #3b3560;
+  --ink: #f6efe3;
+  --soft: #cfc7e4;
+  --dim: #9a92b8;
+  --ghost: #6f6795;
+  --amber: #ffb43d;
+  --red: #ff5240;
+  --teal: #43e0c0;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Space Grotesk', ui-rounded, system-ui, sans-serif;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.noscript-note {
+  position: relative;
+  z-index: 1;
+  padding: 24px;
+  font-size: 16px;
+}
+
+/* ---------------------------------------------------------------------- hud */
+
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
+.hud-top {
+  position: absolute;
+  top: calc(var(--safe-top) + 10px);
+  left: 12px;
+  right: calc(var(--safe-right) + 58px);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hud-block {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.hud-block.hud-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.hud-label {
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+
+.hud-block b {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber);
+  text-shadow: 2px 2px 0 rgba(11, 9, 19, 0.85);
+}
+
+.hud-block.hud-right b {
+  font-size: 15px;
+  color: var(--soft);
+  letter-spacing: 0.04em;
+}
+
+/* Wide layout: the canvas draws the backglass, so the DOM copies step aside. */
+.hud.is-wide .hud-top {
+  display: none;
+}
+
+.hud.is-wide .hud-row {
+  top: calc(var(--safe-top) + 10px);
+}
+
+.hud-row {
+  position: absolute;
+  top: calc(var(--safe-top) + 58px);
+  left: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1.5px solid var(--line-mid);
+  background: rgba(11, 9, 19, 0.7);
+  color: var(--dim);
+}
+
+.pill-teal {
+  color: var(--teal);
+  border-color: var(--teal);
+}
+
+.pill-red {
+  color: var(--red);
+  border-color: var(--red);
+  animation: blink 0.5s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.btn-pause {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  right: calc(var(--safe-right) + 10px);
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: rgba(11, 9, 19, 0.65);
+  border: 2px solid var(--line-mid);
+  color: var(--soft);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.btn-pause:active {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+/* -------------------------------------------------------------- touch zones
+   Invisible, but on a phone these ARE the controls: the bottom two thirds
+   split down the middle into left and right flippers, with the launch strip
+   and the nudge corners beneath them. */
+
+.touch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.touch-flip {
+  position: absolute;
+  top: 22%;
+  bottom: 0;
+  width: 50%;
+  pointer-events: auto;
+}
+
+.touch-l {
+  left: 0;
+}
+
+.touch-r {
+  right: 0;
+}
+
+.touch-plunge {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 8px);
+  width: 168px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  border: 2px solid var(--line-mid);
+  background: rgba(11, 9, 19, 0.55);
+  color: var(--dim);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.touch-plunge.is-armed {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.touch-plunge.is-spent {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.touch-nudge {
+  position: absolute;
+  bottom: calc(var(--safe-bottom) + 8px);
+  width: 84px;
+  height: 52px;
+  pointer-events: auto;
+  border: 2px solid var(--line);
+  background: rgba(11, 9, 19, 0.4);
+}
+
+.touch-nudge::after {
+  content: '↔';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ghost);
+  font-size: 16px;
+}
+
+.touch-nudge-l {
+  left: 10px;
+}
+
+.touch-nudge-r {
+  right: 10px;
+}
+
+.touch-nudge:active {
+  border-color: var(--teal);
+}
+
+/* -------------------------------------------------------------------- panels */
+
+.panel-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
+  pointer-events: auto;
+  background: linear-gradient(rgba(11, 9, 19, 0.62), rgba(11, 9, 19, 0.9));
+  overflow-y: auto;
+}
+
+.panel {
+  width: 100%;
+  max-width: 392px;
+  background: var(--raise);
+  border: 2px solid var(--line);
+  box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.5);
+  padding: 26px 22px;
+  text-align: center;
+}
+
+.kicker {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--teal);
+  font-weight: 700;
+}
+
+.title {
+  margin: 0 0 14px;
+  font-size: clamp(38px, 12vw, 54px);
+  line-height: 0.95;
+  font-weight: 700;
+  color: var(--amber);
+  text-shadow: 4px 4px 0 var(--red);
+}
+
+.title-sm {
+  margin: 0 0 6px;
+  font-size: 32px;
+  color: var(--amber);
+  text-shadow: 3px 3px 0 var(--red);
+}
+
+.copy {
+  margin: 0 0 22px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--soft);
+}
+
+.copy-dim {
+  color: var(--dim);
+  margin-bottom: 16px;
+}
+
+.verbs {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+
+.verbs li {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dim);
+  padding-left: 14px;
+  position: relative;
+}
+
+.verbs li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  background: var(--teal);
+}
+
+.verbs b {
+  color: var(--soft);
+}
+
+.c-teal {
+  color: var(--teal);
+}
+
+.c-red {
+  color: var(--red);
+}
+
+.btn-big {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  background: var(--amber);
+  color: var(--bg);
+  border: 2px solid var(--bg);
+  box-shadow: 6px 6px 0 var(--red);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-big:active {
+  transform: translate(3px, 3px);
+  box-shadow: 2px 2px 0 var(--red);
+}
+
+.best {
+  margin: 14px 0 16px;
+  font-size: 13px;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+}
+
+.menu-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.menu-row-top {
+  margin-top: 14px;
+}
+
+.btn-small {
+  padding: 11px 14px;
+  background: var(--bg);
+  color: var(--soft);
+  border: 2px solid var(--line-mid);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-small:active {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.btn-link {
+  display: inline-block;
+}
+
+.btn-center {
+  margin-top: 12px;
+}
+
+/* ---------------------------------------------------------------- game over */
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.result-grid > div {
+  background: var(--bg);
+  border: 2px solid var(--line);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.result-grid span {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+
+.result-grid b {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.name-form {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.name-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ghost);
+  margin-bottom: 6px;
+}
+
+.name-row {
+  display: flex;
+  gap: 8px;
+}
+
+.name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  background: var(--bg);
+  border: 2px solid var(--line-mid);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.name-input:focus {
+  border-color: var(--amber);
+}
+
+/* Short landscape: the panel has to fit without scrolling. */
+@media (max-height: 470px) {
+  .panel {
+    padding: 16px 18px;
+    max-width: 460px;
+  }
+
+  .title {
+    font-size: clamp(26px, 8vh, 36px);
+    margin-bottom: 8px;
+  }
+
+  .verbs {
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 12px;
+  }
+
+  .btn-big {
+    padding: 12px;
+  }
+
+  .best {
+    margin: 10px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill-red {
+    animation: none;
+  }
+}

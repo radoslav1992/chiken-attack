@@ -5,7 +5,7 @@ small API Worker on Cloudflare. The landing page and per-game pages implement th
 design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
 with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-Two cabinets are open:
+Three cabinets are open:
 
 - **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
   the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
@@ -15,7 +15,11 @@ Two cabinets are open:
   jump, or *press nothing*. Six weather phases, an acorn combo multiplier, a tail-slam dive.
   Distance is banked alongside the score.
 
-Both are fully playable offline and every pixel and sound in them is generated procedurally at
+- **Orbit Cadet** (`/orbit-cadet/`, page at `/games/orbit-cadet/`) — a pinball table with a rank to
+  climb. Two thumbs, two flippers: arm a mission at the rollover, finish it, and get promoted from
+  Cadet to Admiral. Plunger, nudge, tilt, drop-target bank, orbit loop, spinner, multiball.
+
+All three are fully playable offline and every pixel and sound in them is generated procedurally at
 runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
 
 ## Stack
@@ -62,7 +66,7 @@ exist — it also applies pending D1 migrations before deploying.
 | Route | Method | Purpose |
 | --- | --- | --- |
 | `/api/scores?game=<slug>&period=week\|all&limit=N` | GET | Top scores (week = since Monday 00:00 UTC) |
-| `/api/scores` | POST | Submit a run `{ id, game, name, score, wave, difficulty }` — upserts by client run id, so saving a name at game over renames the run instead of duplicating it; a rename can never change the score. `wave` is whatever secondary number the game ranks by: waves cleared in Chicken Attack, metres run in Beaver Dash |
+| `/api/scores` | POST | Submit a run `{ id, game, name, score, wave, difficulty }` — upserts by client run id, so saving a name at game over renames the run instead of duplicating it; a rename can never change the score. `wave` is whatever secondary number the game ranks by: waves cleared in Chicken Attack, metres run in Beaver Dash, rank reached in Orbit Cadet |
 | `/api/signup` | POST | Newsletter signup `{ email }` (honeypot field silently accepted) |
 
 If the D1 binding is missing, reads return empty lists and writes 503 — the site works without
@@ -93,13 +97,15 @@ migrations/                 D1 schema
 public/
   chicken-attack/           game — self-contained PWA, unchanged by the site build
   beaver-dash/              game — same shape, own service worker + icons
+  orbit-cadet/              game — pinball; physics.js and table.js are pure modules
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
   media/                    cabinet/stage art (captured from real gameplay)
   sw.js                     self-destruct stub migrating pre-Astro installs
   _headers                  security headers + cache policy
 wrangler.jsonc              Workers config: assets + Worker + D1
 tools/make-icons.mjs        Chicken Attack icon set
-tools/make-beaver-icons.mjs Beaver Dash icon set   (npm run icons runs both)
+tools/make-beaver-icons.mjs Beaver Dash icon set
+tools/make-orbit-icons.mjs  Orbit Cadet icon set   (npm run icons runs all three)
 ```
 
 ## Notes that save debugging time
@@ -199,3 +205,48 @@ which is what an unaudited random spawner produces by default, and it reads as t
 Patterns are hand-authored, never rolled per-obstacle, and no pattern mixes a heron (be grounded)
 with a gap (be airborne). The rest between patterns is measured in **seconds of reaction time**,
 not metres: at 2.5× speed a fixed metre gap would read 2.5× tighter than it did at the start.
+
+## Orbit Cadet (the game)
+
+| Action | Touch | Keyboard |
+| --- | --- | --- |
+| Left flipper | the left half of the screen | ← / A / Z / Shift |
+| Right flipper | the right half | → / D / ' / slash |
+| Launch | hold the strip at the bottom | hold Space |
+| Nudge | the bottom corners | , and . (or N) |
+| Pause | pause button | P / Esc |
+
+A table where the point is the promotion rather than the score. Roll over MISSION to arm one of
+four — clear the drop-target bank, sweep the beacons, run the orbit, work the spinner — and each one
+finished moves you a rank, Cadet to Admiral. The rank reached is what goes in the leaderboard's
+`wave` column, alongside Chicken Attack's waves and Beaver Dash's metres. Three balls, an extra ball
+at Lieutenant, multiball at Commander, and a tilt that kills the flippers on the fourth shove.
+
+### Two things worth knowing before changing it
+
+**`physics.js` and `table.js` are pure modules — no `window`, no `document`.** That is deliberate:
+the physics can be tested in Node directly, with no browser, which is what made it practical to run
+thousands of seconds of simulation while tuning. Keep them that way.
+
+**Tunnelling is the failure that matters.** A pinball travels many times its own radius per frame —
+at 2400 units/s and 60 fps that is 40 units against an 11-unit ball radius. Rather than full
+continuous collision, `stepBall` caps the step size so the ball can never move more than a third of
+its radius between tests, which makes discrete tests safe and costs nothing since there is one ball.
+The speed cap is applied *after* collision response as well as before: bumper kicks and flipper
+impulses are added during resolution, and clamping only beforehand let a ball caught between two
+bumpers compound kick on kick to 6816 against a 3000 cap — fast enough to defeat the substep bound
+and escape the table.
+
+**THE GAP RULE, which the pinch scan enforces.** Every gap between two pieces of geometry must be
+either flush or comfortably wider than a ball, never in between: at an in-between width the ball
+wedges with both normals cancelling and sits there for the rest of the game. The drop-target bank
+first stood 12 units off the right wall against a 22-unit ball, and the mission selector was a post
+14 units off the orbit guide — both trapped the ball, and every alternative position for that post
+pinched against a bumper instead, which is why the selector is now a rollover sensor with no
+collision geometry at all. Related: with "downhill" always +y, a near-horizontal wall inside the
+table is a shelf the ball can rest on forever, so there are none.
+
+Both rules are checked mechanically rather than by eye — a stochastic wedge test that flies the ball
+from random positions at random speeds with the flippers flapping, and a deterministic pairwise scan
+of every surface. And every scoring feature is proven reachable from a flipper, because a table with
+a shot nobody can make is a dead table.
