@@ -2,6 +2,9 @@
 
 import { clamp, lerp, TAU } from './util.js';
 import { WEAPONS, WEAPON_BY_ID, MAX_LEVEL } from './weapons.js';
+import {
+  POWERUPS, BUFF_ORDER, DRONE_FIRE_SCALE, DRONE_LEVEL_DROP, OVERDRIVE_COOLDOWN,
+} from './powerups.js';
 import { sfx, vibrate } from './audio.js';
 import { settings } from './storage.js';
 
@@ -25,16 +28,84 @@ export class Player {
     this.invuln = 2.2;
     this.thrust = 0;
     this.hitFlash = 0;
+    // Timed power-ups: id -> seconds remaining.
+    this.buffs = {};
+    this.droneCooldown = 0;
+    this.droneT = 0;
 
     if (full) {
-      this.lives = 3;
+      const mode = this.game.mode;
+      this.lives = mode.lives;
       this.weapon = WEAPONS[0];
       this.level = 0;
-      this.missiles = 3;
+      this.missiles = mode.missiles;
       this.food = 0;
       this.shield = 0;
-      this.overheat = 0;
     }
+  }
+
+  /* --------------------------------------------------------------- buffs -- */
+
+  hasBuff(id) {
+    return (this.buffs[id] || 0) > 0;
+  }
+
+  buffLeft(id) {
+    return this.buffs[id] || 0;
+  }
+
+  /** Grab a timed power-up: refreshes the timer if it is already running. */
+  addBuff(id) {
+    const pu = POWERUPS[id];
+    if (!pu) return;
+    const running = this.hasBuff(id);
+    this.buffs[id] = pu.duration;
+    sfx.buff(id);
+    this.game.flash(pu.color);
+    this.game.floatText(
+      running ? `${pu.short} +${pu.duration}s` : pu.name.toUpperCase(),
+      this.x,
+      this.y - 30 * this.game.unit,
+      pu.color
+    );
+    if (id === 'drones') this.droneCooldown = 0.2;
+    vibrate(22);
+  }
+
+  /** Countdown, with a warning as each buff runs out. */
+  updateBuffs(dt) {
+    for (const id of BUFF_ORDER) {
+      const left = this.buffs[id];
+      if (!left) continue;
+      const next = left - dt;
+      if (next <= 0) {
+        this.buffs[id] = 0;
+        sfx.buffEnd();
+        this.game.floatText(`${POWERUPS[id].short} OVER`, this.x, this.y - 34 * this.game.unit, '#adb5bd');
+      } else {
+        this.buffs[id] = next;
+        if (left > 3 && next <= 3) sfx.buffWarn();
+      }
+    }
+  }
+
+  /** Where the escort drones sit, in world coordinates. */
+  dronePositions() {
+    const u = this.game.unit;
+    const sway = Math.sin(this.droneT * 2.2) * 4 * u;
+    return [
+      { x: this.x - 30 * u - this.vx * 0.02, y: this.y + 8 * u + sway },
+      { x: this.x + 30 * u - this.vx * 0.02, y: this.y + 8 * u - sway },
+    ];
+  }
+
+  /** Restore a loadout from an autosaved run. */
+  restore(run) {
+    this.lives = Math.max(1, run.lives | 0);
+    this.weapon = WEAPON_BY_ID[run.weapon] || WEAPONS[0];
+    this.level = clamp(run.level | 0, 0, MAX_LEVEL);
+    this.missiles = clamp(run.missiles | 0, 0, 15);
+    this.food = clamp(run.food | 0, 0, 99);
   }
 
   get spriteKey() {
@@ -48,6 +119,8 @@ export class Player {
     const u = g.unit;
     this.invuln = Math.max(0, this.invuln - dt);
     this.shield = Math.max(0, this.shield - dt);
+    this.updateBuffs(dt);
+    this.droneT += dt;
     this.cooldown -= dt;
     this.missileCooldown -= dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt * 4);
@@ -125,11 +198,25 @@ export class Player {
     /* ---------------------------------------------------------- shooting -- */
     const auto = settings.get('autofire');
     const wantsFire = auto ? true : input.firing || input.keyboardFire;
+    const rate = this.hasBuff('overdrive') ? OVERDRIVE_COOLDOWN : 1;
     if (wantsFire && this.cooldown <= 0 && g.state === 'playing') {
       const kind = this.weapon.fire(g, this, this.level);
-      this.cooldown = Math.max(0.028, this.weapon.cooldown(this.level));
+      this.cooldown = Math.max(0.02, this.weapon.cooldown(this.level) * rate);
       sfx.shoot(kind, this.level);
       g.shake(0.6 * (this.weapon.id === 'plasma' ? 2.4 : 1));
+    }
+
+    /* Escort drones fire the same weapon, a little slower and weaker. */
+    if (this.hasBuff('drones')) {
+      this.droneCooldown -= dt;
+      if (wantsFire && this.droneCooldown <= 0 && g.state === 'playing') {
+        const level = Math.max(0, this.level - DRONE_LEVEL_DROP);
+        for (const d of this.dronePositions()) {
+          // The weapons take any object with x/y/r, so drones reuse them all.
+          this.weapon.fire(g, { x: d.x, y: d.y, r: this.r * 0.5 }, level);
+        }
+        this.droneCooldown = Math.max(0.05, this.weapon.cooldown(level) * DRONE_FIRE_SCALE * rate);
+      }
     }
   }
 
@@ -279,6 +366,40 @@ export class Player {
     ctx.globalAlpha = flicker;
     art.draw(ctx, this.spriteKey, this.x, this.y, this.rot, 1);
     ctx.restore();
+
+    // Escort drones
+    if (this.hasBuff('drones')) {
+      const fade = this.buffLeft('drones') < 3 ? 0.4 + 0.6 * Math.abs(Math.sin(t * 14)) : 1;
+      for (const [i, d] of this.dronePositions().entries()) {
+        ctx.save();
+        ctx.globalAlpha = fade;
+        art.draw(ctx, 'drone', d.x, d.y, this.rot * 0.6 + Math.sin(t * 3 + i) * 0.06, 1);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = fade * (0.5 + Math.sin(t * 30 + i * 2) * 0.2);
+        ctx.fillStyle = 'rgba(140,220,255,0.8)';
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y + this.r * 0.5, this.r * 0.16, this.r * 0.36, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Magnet field
+    if (this.hasBuff('magnet')) {
+      const fade = this.buffLeft('magnet') < 3 ? 0.35 + 0.65 * Math.abs(Math.sin(t * 12)) : 1;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.16 * fade;
+      ctx.strokeStyle = '#ff8787';
+      for (let i = 0; i < 2; i++) {
+        const rr = this.r * (3.4 + i * 1.8) + Math.sin(t * 2.4 + i) * this.r * 0.3;
+        ctx.lineWidth = 1.6 * this.game.unit;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, rr, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // Shield bubble
     if (this.shield > 0) {

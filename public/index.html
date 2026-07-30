@@ -36,9 +36,22 @@
           </header>
 
           <div class="menu-buttons">
+            <button id="btn-continue" class="btn btn-primary is-hidden" type="button">
+              <span class="btn-icon">▶</span> Continue
+              <small id="continue-note" class="btn-note"></small>
+            </button>
             <button id="btn-play" class="btn btn-primary" type="button">
               <span class="btn-icon">▶</span> Start Game
             </button>
+
+            <div class="difficulty" role="radiogroup" aria-label="Difficulty">
+              <div class="difficulty-options">
+                <button type="button" data-difficulty="rookie">Rookie</button>
+                <button type="button" data-difficulty="veteran">Veteran</button>
+                <button type="button" data-difficulty="superstar">Superstar</button>
+              </div>
+              <p id="difficulty-blurb" class="difficulty-blurb"></p>
+            </div>
             <div class="btn-row">
               <button id="btn-how" class="btn btn-ghost" type="button">How to Play</button>
               <button id="btn-scores" class="btn btn-ghost" type="button">Scores</button>
@@ -103,6 +116,21 @@
               </div>
             </div>
             <div class="row">
+              <span class="row-icon">⚡</span>
+              <div>
+                <h3>Power-ups</h3>
+                <p>
+                  Timed boosts show a countdown ring on the right:
+                  <b class="c-drones">Drones</b> add two escort guns,
+                  <b class="c-rapid">Rapid</b> doubles your fire rate,
+                  <b class="c-magnet">Magnet</b> pulls in food,
+                  <b class="c-double">x2</b> doubles points,
+                  <b class="c-warp">Warp</b> slows the chickens, and
+                  <b class="c-nuke">Nuke</b> clears the screen on the spot.
+                </p>
+              </div>
+            </div>
+            <div class="row">
               <span class="row-icon">🥚</span>
               <div>
                 <h3>Watch out</h3>
@@ -127,6 +155,12 @@
           <h2>High Scores</h2>
           <ol id="score-list" class="score-list"></ol>
           <p id="score-empty" class="empty">No runs yet. Go make some omelettes.</p>
+          <dl id="lifetime" class="lifetime">
+            <div><dt>Runs</dt><dd id="lt-games">0</dd></div>
+            <div><dt>Best wave</dt><dd id="lt-wave">0</dd></div>
+            <div><dt>Chickens</dt><dd id="lt-kills">0</dd></div>
+            <div><dt>Drumsticks</dt><dd id="lt-food">0</dd></div>
+          </dl>
           <button class="btn btn-primary sheet-close" type="button" data-close>Back</button>
         </div>
       </section>
@@ -154,6 +188,11 @@
             <label class="toggle">
               <span>Auto-fire</span>
               <input type="checkbox" data-setting="autofire" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Screen shake</span>
+              <input type="checkbox" data-setting="shake" />
               <span class="switch" aria-hidden="true"></span>
             </label>
             <label class="toggle">
@@ -225,6 +264,22 @@
             <div><span>Best</span><b id="go-best">0</b></div>
             <div><span>Waves cleared</span><b id="go-waves">0</b></div>
           </div>
+          <form id="name-form" class="name-form is-hidden" autocomplete="off">
+            <label class="name-label" for="name-input">Name your run</label>
+            <div class="name-row">
+              <input
+                id="name-input"
+                class="name-input"
+                type="text"
+                maxlength="8"
+                inputmode="text"
+                spellcheck="false"
+                autocapitalize="characters"
+                aria-label="Pilot name"
+              />
+              <button id="btn-save-name" class="btn btn-ghost name-save" type="submit">Save</button>
+            </div>
+          </form>
           <button id="btn-again" class="btn btn-primary" type="button">Play Again</button>
           <button id="btn-menu" class="btn btn-ghost" type="button">Main Menu</button>
         </div>

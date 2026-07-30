@@ -4,9 +4,10 @@
  */
 
 import { Game } from './game.js';
-import { settings, scores, highScore } from './storage.js';
+import { settings, scores, highScore, lifetimeStats, loadRun, clearRun, nameLastScore, lastName } from './storage.js';
 import { sfx, music, unlock as unlockAudio, syncMusicSetting, suspend as suspendAudio, resume as resumeAudio } from './audio.js';
 import { formatScore } from './util.js';
+import { DIFFICULTIES, difficultyMode } from './waves.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -59,6 +60,28 @@ function showHud(on) {
 
 /* ---------------------------------------------------------------- settings -- */
 
+function syncDifficultyUi() {
+  const current = settings.get('difficulty');
+  $$('[data-difficulty]').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.difficulty === current));
+  });
+  const mode = difficultyMode(current);
+  $('#difficulty-blurb').textContent = `${mode.name} — ${mode.blurb}`;
+}
+
+/** The Continue button only appears when there is a run worth resuming. */
+function syncContinueUi() {
+  const run = loadRun();
+  const btn = $('#btn-continue');
+  btn.classList.toggle('is-hidden', !run);
+  if (run) {
+    const mode = difficultyMode(run.difficulty);
+    $('#continue-note').textContent =
+      `Wave ${run.wave} · ${formatScore(run.score)} pts · ${mode.name}`;
+  }
+  return run;
+}
+
 function syncSettingsUi() {
   $$('input[data-setting]').forEach((input) => {
     input.checked = !!settings.get(input.dataset.setting);
@@ -106,13 +129,30 @@ function renderScores() {
   rows.forEach((row, i) => {
     const li = document.createElement('li');
     if (i === 0) li.classList.add('is-top');
-    li.innerHTML =
-      `<span class="pos">${i + 1}</span>` +
-      `<span class="nm">${row.name}</span>` +
-      `<span class="wv">wave ${row.wave}</span>` +
-      `<span class="pts">${formatScore(row.score)}</span>`;
+    const mode = DIFFICULTIES[row.difficulty] ? row.difficulty : 'veteran';
+    // Built from DOM nodes rather than innerHTML: names are player input.
+    const cells = [
+      ['span', 'pos', String(i + 1)],
+      ['span', 'nm', row.name],
+      ['span', `diff is-${mode}`, DIFFICULTIES[mode].badge],
+      ['span', 'wv', `wave ${row.wave}`],
+      ['span', 'pts', formatScore(row.score)],
+    ];
+    for (const [tag, cls, text] of cells) {
+      const el = document.createElement(tag);
+      el.className = cls;
+      el.textContent = text;
+      li.appendChild(el);
+    }
     list.appendChild(li);
   });
+
+  const lt = lifetimeStats();
+  $('#lt-games').textContent = formatScore(lt.games);
+  $('#lt-wave').textContent = lt.bestWave;
+  $('#lt-kills').textContent = formatScore(lt.kills);
+  $('#lt-food').textContent = formatScore(lt.food);
+  $('#lifetime').classList.toggle('is-hidden', lt.games === 0);
 }
 
 function renderBest() {
@@ -121,7 +161,7 @@ function renderBest() {
 
 /* ------------------------------------------------------------- menu wiring -- */
 
-function startGame() {
+function startGame(resume = null) {
   unlockAudio();
   show(null);
   showHud(true);
@@ -131,7 +171,7 @@ function startGame() {
   hint.textContent = settings.get('autofire') ? 'Drag to fly' : 'Drag to fly & fire';
   clearTimeout(hintTimer);
   hintTimer = setTimeout(dismissHint, 4500);
-  game.newGame();
+  game.newGame(resume);
 }
 
 function dismissHint() {
@@ -143,7 +183,26 @@ function dismissHint() {
 
 $('#btn-play').addEventListener('click', () => {
   sfx.ui();
+  clearRun();
   startGame();
+});
+
+$('#btn-continue').addEventListener('click', () => {
+  sfx.ui();
+  const run = loadRun();
+  if (!run) {
+    syncContinueUi();
+    return;
+  }
+  startGame(run);
+});
+
+$$('[data-difficulty]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    settings.set('difficulty', btn.dataset.difficulty);
+    syncDifficultyUi();
+    sfx.ui();
+  });
 });
 
 $('#btn-how').addEventListener('click', () => {
@@ -186,15 +245,17 @@ $('#btn-restart').addEventListener('click', () => {
   sfx.ui();
   show(null);
   showHud(true);
-  game.togglePause(); // leave paused state
+  clearRun();
   startGame();
 });
 
 $('#btn-quit').addEventListener('click', () => {
   sfx.uiBack();
   showHud(false);
+  game.autosave();
   game.quitToMenu();
   renderBest();
+  syncContinueUi();
   show('menu');
 });
 
@@ -217,6 +278,13 @@ game.on('gameover', (result) => {
   $('#go-food').textContent = result.stats.food;
   $('#go-best').textContent = formatScore(result.best);
   $('#go-waves').textContent = result.stats.waves;
+  const nameForm = $('#name-form');
+  const nameInput = $('#name-input');
+  nameForm.classList.toggle('is-hidden', result.rank === 0);
+  if (result.rank > 0) {
+    nameInput.value = lastName();
+    nameSaved = false;
+  }
   const rankEl = $('#go-rank');
   if (result.rank === 1) {
     $('#go-title').textContent = 'New High Score!';
@@ -229,22 +297,48 @@ game.on('gameover', (result) => {
     rankEl.textContent = '';
   }
   renderBest();
+  syncContinueUi();
   show('gameover');
 });
 
+$('#name-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  saveName();
+});
+
+$('#name-input').addEventListener('blur', saveName);
+
 $('#btn-again').addEventListener('click', () => {
   sfx.ui();
+  saveName();
   startGame();
 });
 
 $('#btn-menu').addEventListener('click', () => {
   sfx.uiBack();
+  saveName();
   game.quitToMenu();
   renderBest();
+  syncContinueUi();
   show('menu');
 });
 
 /* -------------------------------------------------------------- hud extras -- */
+
+let nameSaved = false;
+
+function saveName() {
+  if (nameSaved) return;
+  const input = $('#name-input');
+  if (!nameLastScore(input.value)) return;
+  nameSaved = true;
+  input.blur();
+  $('#btn-save-name').textContent = 'Saved';
+  sfx.pickup();
+  setTimeout(() => {
+    $('#btn-save-name').textContent = 'Save';
+  }, 1600);
+}
 
 const missileBtn = $('#btn-missile');
 const missileCount = $('#missile-count');
@@ -278,9 +372,10 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', resi
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (game.state === 'playing' || game.state === 'wave-intro' || game.state === 'wave-clear') {
+    if (['playing', 'wave-intro', 'wave-clear', 'countdown'].includes(game.state)) {
       game.togglePause(true);
     }
+    game.autosave();
     suspendAudio();
   } else {
     resumeAudio();
@@ -330,6 +425,8 @@ if ('serviceWorker' in navigator) {
 measureSafeArea();
 game.resize();
 syncSettingsUi();
+syncDifficultyUi();
+syncContinueUi();
 renderBest();
 show('menu');
 game.startAttract();

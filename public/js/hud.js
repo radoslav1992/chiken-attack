@@ -1,7 +1,8 @@
 /* In-canvas HUD: score, wave, lives, weapon power, missiles and banners. */
 
-import { clamp, formatScore, roundRect, easeOutBack } from './util.js';
+import { clamp, formatScore, roundRect, easeOutBack, TAU } from './util.js';
 import { MAX_LEVEL } from './weapons.js';
+import { POWERUPS, BUFF_ORDER } from './powerups.js';
 import { highScore } from './storage.js';
 
 const FONT = '"Baloo 2", system-ui, -apple-system, sans-serif';
@@ -86,7 +87,81 @@ export function drawHud(ctx, game) {
     // Missile stock lives on the on-screen button (see the DOM HUD).
   }
 
+  drawBuffs(ctx, game);
+
   ctx.restore();
+}
+
+/**
+ * Active power-ups, as a column of chips down the right edge (below the pause
+ * button, above the missile button). Each chip is a countdown ring plus a short
+ * label, and blinks in its last three seconds.
+ */
+function drawBuffs(ctx, game) {
+  const p = game.player;
+  if (!p) return;
+  const u = game.unit;
+  const size = 30 * u;
+  const x = game.w - size * 0.5 - 10 * u;
+  let y = game.insetTop + 58 * u;
+
+  const chips = [];
+  for (const id of BUFF_ORDER) {
+    const left = p.buffLeft(id);
+    if (left > 0) {
+      chips.push({
+        left,
+        total: POWERUPS[id].duration,
+        color: POWERUPS[id].color,
+        icon: `icon_${id}`,
+      });
+    }
+  }
+  if (p.shield > 0) chips.push({ left: p.shield, total: 12, color: '#66d9e8', icon: 'icon_shield' });
+
+  for (const chip of chips) {
+    const frac = clamp(chip.left / chip.total, 0, 1);
+    const ending = chip.left <= 3;
+    const alpha = ending ? 0.45 + 0.55 * Math.abs(Math.sin(game.time * 12)) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+
+    ctx.fillStyle = 'rgba(6,10,22,0.62)';
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.5, 0, TAU);
+    ctx.fill();
+
+    // Countdown ring
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 3 * u;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = chip.color;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
+    ctx.stroke();
+
+    // Glyph rather than text: it always fits the circle.
+    game.art.draw(ctx, chip.icon, 0, 0, 0, 1);
+
+    // Seconds left, small, under the glyph.
+    if (chip.left <= 9.5) {
+      ctx.font = `900 ${Math.round(9 * u)}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2.5 * u;
+      ctx.strokeStyle = 'rgba(4,6,16,0.9)';
+      ctx.strokeText(String(Math.ceil(chip.left)), 0, size * 0.62);
+      ctx.fillStyle = chip.color;
+      ctx.fillText(String(Math.ceil(chip.left)), 0, size * 0.62);
+    }
+    ctx.restore();
+
+    y += size + 6 * u;
+  }
 }
 
 export function drawBossBar(ctx, game, boss) {

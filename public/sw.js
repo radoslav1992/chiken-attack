@@ -4,7 +4,7 @@
  * cache-first with a background refresh.
  */
 
-const VERSION = 'chicken-attack-v2';
+const VERSION = 'chicken-attack-v4';
 
 /*
  * './' is the canonical app shell URL. Hosts that normalise /index.html to /
@@ -23,6 +23,7 @@ const ASSETS = [
   'js/enemies.js',
   'js/waves.js',
   'js/weapons.js',
+  'js/powerups.js',
   'js/effects.js',
   'js/hud.js',
   'js/art.js',

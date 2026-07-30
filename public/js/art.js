@@ -4,6 +4,7 @@
  */
 
 import { TAU, rand, clamp } from './util.js';
+import { POWERUPS } from './powerups.js';
 
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -268,7 +269,7 @@ function paintDrumstick(ctx, s) {
   ctx.restore();
 }
 
-function paintGift(ctx, s, color = '#ff4d6d', ribbon = '#ffe066', label = '') {
+function paintGift(ctx, s, color = '#ff4d6d', ribbon = '#ffe066', label = '', glyph = null) {
   const r = s * 0.5;
   const g = ctx.createLinearGradient(-r, -r, r, r);
   g.addColorStop(0, color);
@@ -298,6 +299,169 @@ function paintGift(ctx, s, color = '#ff4d6d', ribbon = '#ffe066', label = '') {
     ctx.textBaseline = 'middle';
     ctx.fillText(label, 0, s * 0.02);
   }
+  if (glyph && GLYPHS[glyph]) {
+    ctx.save();
+    // Dark plate behind the glyph so it reads on any box colour.
+    ctx.fillStyle = 'rgba(12,16,30,0.55)';
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.42, 0, TAU);
+    ctx.fill();
+    GLYPHS[glyph](ctx, s * 0.8);
+    ctx.restore();
+  }
+}
+
+/*
+ * Power-up glyphs, drawn inside a gift box. Each one is centred on the origin
+ * and sized to roughly `s` pixels across.
+ */
+const GLYPHS = {
+  drones(ctx, s) {
+    const r = s * 0.5;
+    ctx.fillStyle = '#ffffff';
+    for (const sx of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(sx * r * 0.52, 0, r * 0.3, r * 0.2, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillRect(sx * r * 0.52 - r * 0.05, -r * 0.5, r * 0.1, r * 0.32);
+    }
+    ctx.fillStyle = '#8ef1ff';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.55);
+    ctx.lineTo(r * 0.26, r * 0.4);
+    ctx.lineTo(-r * 0.26, r * 0.4);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  bolt(ctx, s) {
+    const r = s * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(r * 0.12, -r * 0.72);
+    ctx.lineTo(-r * 0.42, r * 0.1);
+    ctx.lineTo(-r * 0.04, r * 0.1);
+    ctx.lineTo(-r * 0.18, r * 0.72);
+    ctx.lineTo(r * 0.44, -r * 0.12);
+    ctx.lineTo(r * 0.04, -r * 0.12);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  magnet(ctx, s) {
+    const r = s * 0.5;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = r * 0.28;
+    ctx.beginPath();
+    ctx.arc(0, r * 0.1, r * 0.46, Math.PI, 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.46, r * 0.1);
+    ctx.lineTo(-r * 0.46, r * 0.5);
+    ctx.moveTo(r * 0.46, r * 0.1);
+    ctx.lineTo(r * 0.46, r * 0.5);
+    ctx.stroke();
+    ctx.strokeStyle = '#ff8787';
+    ctx.lineWidth = r * 0.28;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.46, r * 0.5);
+    ctx.lineTo(-r * 0.46, r * 0.72);
+    ctx.moveTo(r * 0.46, r * 0.5);
+    ctx.lineTo(r * 0.46, r * 0.72);
+    ctx.stroke();
+  },
+
+  x2(ctx, s) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.round(s * 0.72)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('x2', 0, s * 0.04);
+  },
+
+  clock(ctx, s) {
+    const r = s * 0.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = r * 0.16;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.6, 0, TAU);
+    ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -r * 0.36);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(r * 0.3, r * 0.1);
+    ctx.stroke();
+  },
+
+  shield(ctx, s) {
+    const r = s * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.72);
+    ctx.lineTo(r * 0.56, -r * 0.44);
+    ctx.quadraticCurveTo(r * 0.56, r * 0.42, 0, r * 0.76);
+    ctx.quadraticCurveTo(-r * 0.56, r * 0.42, -r * 0.56, -r * 0.44);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.46);
+    ctx.lineTo(r * 0.34, -r * 0.28);
+    ctx.quadraticCurveTo(r * 0.34, r * 0.26, 0, r * 0.5);
+    ctx.quadraticCurveTo(-r * 0.34, r * 0.26, -r * 0.34, -r * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  },
+
+  nuke(ctx, s) {
+    const r = s * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, r * 0.12, r * 0.44, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#ffe066';
+    ctx.beginPath();
+    ctx.arc(0, r * 0.12, r * 0.2, 0, TAU);
+    ctx.fill();
+    // Fuse
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = r * 0.14;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(r * 0.1, -r * 0.3);
+    ctx.quadraticCurveTo(r * 0.5, -r * 0.5, r * 0.4, -r * 0.76);
+    ctx.stroke();
+  },
+};
+
+/** Escort drone: a stubby gun pod that flanks the ship. */
+function paintDrone(ctx, s) {
+  const r = s * 0.5;
+  const body = ctx.createLinearGradient(0, -r * 0.6, 0, r * 0.6);
+  body.addColorStop(0, '#e8f4ff');
+  body.addColorStop(0.55, '#7fb8e0');
+  body.addColorStop(1, '#2f5f8a');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 0.56, r * 0.72, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#1b2a44';
+  ctx.fillRect(-r * 0.11, -r * 0.95, r * 0.22, r * 0.4);
+  const dome = ctx.createRadialGradient(-r * 0.12, -r * 0.2, 0, 0, 0, r * 0.4);
+  dome.addColorStop(0, '#ffffff');
+  dome.addColorStop(1, '#8ef1ff');
+  ctx.fillStyle = dome;
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.08, r * 0.24, r * 0.28, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(120,200,255,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.62, r * 0.2, r * 0.16, 0, 0, TAU);
+  ctx.fill();
 }
 
 function paintAsteroid(ctx, s, seed = 1, color = '#8a7f75') {
@@ -332,6 +496,85 @@ function paintAsteroid(ctx, s, seed = 1, color = '#8a7f75') {
     ctx.ellipse(Math.cos(a) * d, Math.sin(a) * d, r * 0.12, r * 0.09, a, 0, TAU);
     ctx.fill();
   }
+}
+
+/** Boss saucer: wide hull, glass dome with a pilot chicken silhouette, bays. */
+function paintMothership(ctx, s) {
+  const r = s * 0.5;
+
+  // Lower hull
+  const hull = ctx.createLinearGradient(0, -r * 0.1, 0, r * 0.55);
+  hull.addColorStop(0, '#e6edf6');
+  hull.addColorStop(0.45, '#93a3b8');
+  hull.addColorStop(1, '#3c4655');
+  ctx.fillStyle = hull;
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.2, r * 0.98, r * 0.34, 0, 0, TAU);
+  ctx.fill();
+
+  // Rim highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = Math.max(1, s * 0.012);
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.14, r * 0.94, r * 0.3, 0, Math.PI, TAU);
+  ctx.stroke();
+
+  // Bay hatches
+  ctx.fillStyle = 'rgba(24,32,48,0.85)';
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(sx * r * 0.58, r * 0.3, r * 0.2, r * 0.08, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  // Upper deck
+  const deck = ctx.createLinearGradient(0, -r * 0.5, 0, r * 0.1);
+  deck.addColorStop(0, '#cfd8e3');
+  deck.addColorStop(1, '#6c7a8d');
+  ctx.fillStyle = deck;
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.02, r * 0.66, r * 0.28, 0, 0, TAU);
+  ctx.fill();
+
+  // Dome
+  const dome = ctx.createRadialGradient(-r * 0.16, -r * 0.42, r * 0.04, 0, -r * 0.1, r * 0.5);
+  dome.addColorStop(0, 'rgba(255,255,255,0.95)');
+  dome.addColorStop(0.45, 'rgba(143,230,255,0.85)');
+  dome.addColorStop(1, 'rgba(38,110,160,0.9)');
+  ctx.fillStyle = dome;
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.42, r * 0.42, 0, Math.PI, TAU);
+  ctx.fill();
+
+  // Pilot chicken inside the dome
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.4, r * 0.4, 0, Math.PI, TAU);
+  ctx.clip();
+  ctx.globalAlpha = 0.9;
+  ctx.translate(0, -r * 0.12);
+  paintChicken(ctx, s * 0.34, { comb: '#e8443a', angry: true, wing: -0.2 });
+  ctx.restore();
+
+  // Dome frame
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = Math.max(1, s * 0.014);
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.06, r * 0.42, r * 0.42, 0, Math.PI, TAU);
+  ctx.stroke();
+
+  // Beam emitter under the belly
+  const em = ctx.createRadialGradient(0, r * 0.44, 0, 0, r * 0.44, r * 0.24);
+  em.addColorStop(0, 'rgba(255,140,140,0.95)');
+  em.addColorStop(1, 'rgba(255,80,80,0)');
+  ctx.fillStyle = em;
+  ctx.beginPath();
+  ctx.arc(0, r * 0.44, r * 0.24, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#40485a';
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.42, r * 0.14, r * 0.08, 0, 0, TAU);
+  ctx.fill();
 }
 
 function paintMissileIcon(ctx, s) {
@@ -461,7 +704,24 @@ export class Art {
     c.giftShield = sprite(S(26), (g, s) => paintGift(g, s, '#15aabf', '#c5f6fa'));
     c.giftLife = sprite(S(26), (g, s) => paintGift(g, s, '#f783ac', '#fff0f6'));
     c.missile = sprite(S(20), (g, s) => paintMissileIcon(g, s));
+    c.drone = sprite(S(22), (g, s) => paintDrone(g, s));
+
+    // One gift box per timed power-up, glyph baked in…
+    for (const pu of Object.values(POWERUPS)) {
+      c[`gift_${pu.id}`] = sprite(S(26), (g, s) => paintGift(g, s, pu.box, pu.color, '', pu.glyph));
+    }
+    // …plus a bare glyph for the HUD countdown chips.
+    const icon = (key, glyph, color) => {
+      c[key] = sprite(S(15), (g, s) => {
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        GLYPHS[glyph](g, s);
+      });
+    };
+    for (const pu of Object.values(POWERUPS)) icon(`icon_${pu.id}`, pu.glyph, pu.color);
+    icon('icon_shield', 'shield', '#66d9e8');
     c.ufo = sprite(S(46), (g, s) => paintUfo(g, s));
+    c.mothership = sprite(S(140), (g, s) => paintMothership(g, s));
     c.asteroid = [0, 1, 2].map((i) => sprite(S(46), (g, s) => paintAsteroid(g, s, i + 1)));
     c.asteroidSmall = [0, 1, 2].map((i) => sprite(S(24), (g, s) => paintAsteroid(g, s, i + 3, '#6f665e')));
     c.feather = [0, 1].map((i) =>

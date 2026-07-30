@@ -4,17 +4,20 @@
  * small callback surface at the bottom of the class.
  */
 
-import { TAU, rand, chance, clamp, lerp, angleTo, dist, pick, Pool } from './util.js';
+import { TAU, rand, chance, clamp, lerp, angleTo, dist, pick, Pool, cachedGradient, clearGradientCache } from './util.js';
 import { Art, Starfield } from './art.js';
 import { Effects } from './effects.js';
 import { Input } from './input.js';
 import { Player } from './player.js';
 import { Chicken, Ufo } from './enemies.js';
-import { Wave, Formation, difficultyFor } from './waves.js';
+import { Wave, Formation, difficultyFor, difficultyMode } from './waves.js';
 import { WEAPONS, drawBullet, drawMissile, drawEnemyShot, nearestEnemy } from './weapons.js';
 import { sfx, music, vibrate, unlock as unlockAudio } from './audio.js';
-import { settings, submitScore, highScore } from './storage.js';
+import { settings, submitScore, highScore, saveRun, loadRun, clearRun } from './storage.js';
 import { drawHud, drawBanner, drawBossBar } from './hud.js';
+import {
+  POWERUPS, isPowerup, MAGNET_RANGE, WARP_FACTOR, NUKE_DAMAGE, NUKE_DAMAGE_PER_WAVE,
+} from './powerups.js';
 
 const GIFTS = ['weapon', 'power', 'missile', 'shield', 'life'];
 
@@ -106,7 +109,17 @@ export class Game {
     this.player = null;
     this.boss = null;
     this.wave = null;
-    this.difficulty = difficultyFor(1);
+    this.mode = difficultyMode(settings.get('difficulty'));
+    this.difficulty = difficultyFor(1, this.mode);
+
+    // Players who ask for less motion get no shake, no flashes, no slow-mo.
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.prefersReducedMotion = motionQuery.matches;
+    if (motionQuery.addEventListener) {
+      motionQuery.addEventListener('change', (e) => {
+        this.prefersReducedMotion = e.matches;
+      });
+    }
 
     this.hooks = {};
     this.input.onPause = () => this.togglePause();
@@ -157,6 +170,7 @@ export class Game {
     this.insetBottom = 26 * this.unit + (this.safeBottom || 0);
     this.insetTop = 6 * this.unit + (this.safeTop || 0);
 
+    clearGradientCache();
     this.art.build(this.unit, dpr);
     this.stars.init(w, h, this.unit);
     this.formation.resize();
@@ -209,17 +223,25 @@ export class Game {
     this.timeScale = 1;
   }
 
-  newGame() {
+  /**
+   * Start a run. Pass a snapshot from `loadRun()` to continue where the player
+   * left off; otherwise everything starts from wave 1.
+   */
+  newGame(resume = null) {
     unlockAudio();
     this.reset();
-    this.score = 0;
-    this.waveNum = 0;
+    this.mode = difficultyMode(resume ? resume.difficulty : settings.get('difficulty'));
+    this.score = resume ? resume.score : 0;
+    this.waveNum = resume ? resume.wave - 1 : 0;
     this.combo = 0;
     this.comboTimer = 0;
     this.scoreMult = 1;
-    this.stats = { kills: 0, shots: 0, hits: 0, food: 0, waves: 0, missilesFired: 0 };
+    this.stats = resume
+      ? { kills: 0, shots: 0, hits: 0, food: 0, waves: 0, missilesFired: 0, ...(resume.stats || {}) }
+      : { kills: 0, shots: 0, hits: 0, food: 0, waves: 0, missilesFired: 0 };
     this.player = new Player(this);
     this.player.reset(true);
+    if (resume) this.player.restore(resume);
     this.input.enabled = true;
     this.input.reset();
     this.ufoTimer = rand(34, 18);
@@ -228,6 +250,27 @@ export class Game {
     this.nextWave();
     music.start('space');
     this.emit('hud', this.snapshot());
+  }
+
+  /** Snapshot of the run, written at every wave boundary. */
+  autosave() {
+    const p = this.player;
+    if (!p || this.state === 'gameover') return;
+    saveRun({
+      difficulty: this.mode.id,
+      wave: this.waveNum,
+      score: Math.floor(this.score),
+      lives: p.lives,
+      weapon: p.weapon.id,
+      level: p.level,
+      missiles: p.missiles,
+      food: p.food,
+      stats: this.stats,
+    });
+  }
+
+  hasSavedRun() {
+    return loadRun();
   }
 
   quitToMenu() {
@@ -241,14 +284,18 @@ export class Game {
 
   nextWave() {
     this.waveNum += 1;
-    this.difficulty = difficultyFor(this.waveNum);
+    this.difficulty = difficultyFor(this.waveNum, this.mode);
     this.wave = new Wave(this, this.waveNum);
     this.state = 'wave-intro';
     this.stateTimer = this.wave.isBoss ? 2.4 : 1.5;
     this.banner = {
-      title: this.wave.isBoss ? 'WARNING' : `WAVE ${this.waveNum}`,
-      sub: this.wave.isBoss ? 'BOSS APPROACHING' : this.wave.label,
-      color: this.wave.isBoss ? '#ff6b6b' : '#8ef1ff',
+      title: this.wave.isBoss ? 'WARNING' : this.wave.isFeast ? 'FEAST TIME' : `WAVE ${this.waveNum}`,
+      sub: this.wave.isBoss
+        ? 'BOSS APPROACHING'
+        : this.wave.isFeast
+          ? 'GRAB THE GRUB'
+          : this.wave.label,
+      color: this.wave.isBoss ? '#ff6b6b' : this.wave.isFeast ? '#ffd166' : '#8ef1ff',
       t: 0,
     };
     if (this.wave.isBoss) {
@@ -257,7 +304,9 @@ export class Game {
       vibrate([30, 60, 30]);
     } else {
       music.setMode('space');
+      if (this.wave.isFeast) sfx.waveClear();
     }
+    this.autosave();
     this.emit('hud', this.snapshot());
   }
 
@@ -323,14 +372,24 @@ export class Game {
     });
   }
 
+  /**
+   * Weighted gift table. Permanent upgrades stay the most common; the timed
+   * power-ups fill the rest, with the screen-clearing nuke as the rare prize.
+   */
   rollGift(favourWeapon = false) {
-    if (favourWeapon && chance(0.55)) return 'weapon';
+    if (favourWeapon && chance(0.5)) return 'weapon';
     const r = Math.random();
-    if (r < 0.36) return 'weapon';
-    if (r < 0.6) return 'power';
-    if (r < 0.78) return 'missile';
-    if (r < 0.93) return 'shield';
-    return 'life';
+    if (r < 0.26) return 'weapon';
+    if (r < 0.42) return 'power';
+    if (r < 0.53) return 'missile';
+    if (r < 0.61) return 'shield';
+    if (r < 0.65) return 'life';
+    if (r < 0.73) return 'drones';
+    if (r < 0.81) return 'overdrive';
+    if (r < 0.87) return 'magnet';
+    if (r < 0.93) return 'double';
+    if (r < 0.97) return 'warp';
+    return 'nuke';
   }
 
   spawnPickup(x, y, type) {
@@ -375,6 +434,25 @@ export class Game {
       case 'paused':
         this.stars.update(dtRaw * 0.15);
         break;
+      case 'countdown': {
+        // Frozen world with a 3-2-1 so nobody resumes straight into an egg.
+        this.stars.update(dtRaw * 0.4);
+        this.stateTimer -= dtRaw;
+        if (this.stateTimer <= 0) {
+          this.state = this._resumeState || 'playing';
+          this.banner = null;
+          this.input.reset();
+          break;
+        }
+        // One banner per number, so each digit pops in.
+        const n = Math.ceil(this.stateTimer);
+        if (n !== this._countdownAt) {
+          this._countdownAt = n;
+          sfx.countdown(n);
+          this.banner = { title: String(n), sub: 'GET READY', color: '#8ef1ff', t: 0 };
+        }
+        break;
+      }
       case 'gameover':
         this.updateWorld(dt, false);
         break;
@@ -453,8 +531,12 @@ export class Game {
 
   updateWorld(dt, live) {
     const p = this.player;
+    // Time warp slows everything hostile — enemies, their shots and the
+    // formation drift — while the ship and its bullets stay at full speed.
+    const warped = p && !p.dead && p.hasBuff('warp');
+    const edt = warped ? dt * WARP_FACTOR : dt;
     this.stars.update(dt, this.state === 'playing' ? 1 : 0.6);
-    this.formation.update(dt);
+    this.formation.update(edt);
     this.shakeAmount *= Math.pow(0.0015, dt);
     this.flashAlpha = Math.max(0, this.flashAlpha - dt * 3.2);
 
@@ -466,7 +548,7 @@ export class Game {
       }
     }
 
-    if (live && this.wave) this.wave.update(dt);
+    if (live && this.wave) this.wave.update(edt);
 
     if (p && !p.dead) p.update(dt, this.input);
 
@@ -474,7 +556,7 @@ export class Game {
     const list = this.enemies.active;
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
-      e.update(dt);
+      e.update(edt);
       if (e.dead) {
         if (e === this.boss) this.boss = null;
         list.splice(i, 1);
@@ -483,7 +565,7 @@ export class Game {
 
     this.updateBullets(dt);
     this.updateMissiles(dt);
-    this.updateEnemyShots(dt);
+    this.updateEnemyShots(edt);
     this.updatePickups(dt);
 
     for (let i = this.arcs.length - 1; i >= 0; i--) {
@@ -512,7 +594,7 @@ export class Game {
     }
 
     /* --- UFO bonus -------------------------------------------------------- */
-    if (live && this.state === 'playing' && !this.wave.isBoss) {
+    if (live && this.state === 'playing' && !this.wave.isBoss && !this.wave.isFeast) {
       this.ufoTimer -= dt;
       if (this.ufoTimer <= 0) {
         this.ufoTimer = rand(46, 26);
@@ -698,10 +780,11 @@ export class Game {
       // Gentle magnetism so drumsticks feel collectable on a small screen.
       if (p && !p.dead) {
         const d = dist(k.x, k.y, p.x, p.y);
-        const range = k.homing ? Infinity : 110 * u;
+        const magnet = p.hasBuff('magnet');
+        const range = k.homing ? Infinity : (magnet ? MAGNET_RANGE : 110) * u;
         if (d < range) {
           const a = angleTo(k.x, k.y, p.x, p.y);
-          const pull = k.homing ? 900 * u * dt : (1 - d / range) * 620 * u * dt;
+          const pull = k.homing || magnet ? 900 * u * dt : (1 - d / range) * 620 * u * dt;
           k.vx += Math.cos(a) * pull;
           k.vy += Math.sin(a) * pull;
         }
@@ -759,6 +842,11 @@ export class Game {
       case 'life':
         p.addLife();
         break;
+      case 'nuke':
+        this.detonateNuke();
+        break;
+      default:
+        if (isPowerup(k.type)) p.addBuff(k.type);
     }
     this.emit('hud', this.snapshot());
   }
@@ -766,6 +854,9 @@ export class Game {
   /* ------------------------------------------------------------ score/juice -- */
 
   addScore(n, x, y) {
+    const p = this.player;
+    if (p && p.hasBuff('double')) n *= 2;
+    n = Math.round(n * this.mode.scoreMul);
     this.score += n;
     if (x != null && n >= 100) this.fx.text(`+${n}`, x, y, '#ffe066', 12, 0.75);
     this.emit('hud', this.snapshot());
@@ -786,19 +877,51 @@ export class Game {
       e.dead = true;
     });
     this.enemyShots.sweep();
-    this.timeScale = 0.55;
-    setTimeout(() => {
-      this.timeScale = 1;
-    }, 700);
+    if (!this.prefersReducedMotion) {
+      this.timeScale = 0.55;
+      setTimeout(() => {
+        this.timeScale = 1;
+      }, 700);
+    }
+  }
+
+  /** Instant power-up: scours the screen and wipes incoming fire. */
+  detonateNuke() {
+    const dmg = NUKE_DAMAGE + this.waveNum * NUKE_DAMAGE_PER_WAVE;
+    const cx = this.w * 0.5;
+    const cy = this.h * 0.45;
+    sfx.nuke();
+    this.flash('rgba(255,240,220,0.9)');
+    this.shake(16);
+    vibrate([40, 30, 80]);
+    this.fx.shockwave(cx, cy, Math.max(this.w, this.h), 'rgba(255,230,180,0.95)', 0.8, 8);
+    this.fx.shockwave(cx, cy, Math.max(this.w, this.h) * 0.6, 'rgba(255,140,120,0.9)', 0.55, 6);
+
+    // Every egg in flight is scrambled.
+    this.enemyShots.forEach((e) => {
+      this.fx.splat(e.x, e.y, '#fff8e1');
+      e.dead = true;
+    });
+    this.enemyShots.sweep();
+
+    // Damage everything on screen, bosses included (they take a fraction).
+    const targets = this.enemies.active.slice();
+    for (const e of targets) {
+      if (e.y < -e.r) continue;
+      this.fx.explosion(e.x, e.y, 0.6, '#ffd8a8');
+      e.hurt(e.isBoss ? dmg * 0.55 : dmg, 'nuke');
+    }
+    this.emit('hud', this.snapshot());
   }
 
   shake(amount) {
+    if (this.prefersReducedMotion || !settings.get('shake')) return;
     this.shakeAmount = Math.min(26, this.shakeAmount + amount);
   }
 
   flash(color) {
     this.flashColor = color;
-    this.flashAlpha = 0.55;
+    this.flashAlpha = this.prefersReducedMotion ? 0.2 : 0.55;
   }
 
   floatText(text, x, y, color) {
@@ -807,6 +930,17 @@ export class Game {
 
   /* ------------------------------------------------------------------ death -- */
 
+  /** Apply one hit to the ship, handling shields and the death sequence. */
+  damagePlayer() {
+    const p = this.player;
+    if (!p || p.dead) return false;
+    if (p.takeHit()) {
+      this.killPlayer();
+      return true;
+    }
+    return false;
+  }
+
   killPlayer() {
     const p = this.player;
     this.fx.explosion(p.x, p.y, 2.4, '#ff8787');
@@ -814,7 +948,7 @@ export class Game {
     this.fx.shockwave(p.x, p.y, 140 * this.unit, 'rgba(255,180,180,0.9)', 0.6, 5);
     this.shake(14);
     this.flash('rgba(255,80,80,0.45)');
-    this.timeScale = 0.4;
+    this.timeScale = this.prefersReducedMotion ? 1 : 0.4;
     this.state = 'life-lost';
     this.stateTimer = 1.5;
     this.combo = 0;
@@ -844,26 +978,38 @@ export class Game {
     this.input.enabled = false;
     music.stop(0.8);
     sfx.gameOver();
-    const rank = submitScore(this.score, this.waveNum);
+    clearRun();
+    const rank = submitScore(this.score, this.waveNum, {
+      difficulty: this.mode.id,
+      kills: this.stats.kills,
+      food: this.stats.food,
+    });
     this.emit('gameover', {
       score: this.score,
       wave: this.waveNum,
       rank,
       best: highScore(),
+      difficulty: this.mode,
       stats: { ...this.stats },
     });
   }
 
   togglePause(force) {
-    if (this.state === 'playing' || this.state === 'wave-intro' || this.state === 'wave-clear') {
-      this._resumeState = this.state;
+    const pausable = ['playing', 'wave-intro', 'wave-clear', 'countdown'];
+    if (pausable.includes(this.state)) {
+      if (this.state !== 'countdown') this._resumeState = this.state;
       this.state = 'paused';
+      this.banner = null;
       this.input.reset();
       music.duck(true);
       this.emit('pause', true);
     } else if (this.state === 'paused' && force !== true) {
-      this.state = this._resumeState || 'playing';
+      this.state = 'countdown';
+      this.stateTimer = 3;
+      this._countdownAt = null;
+      this.input.reset();
       music.duck(false);
+      sfx.countdown(3);
       this.emit('pause', false);
     }
   }
@@ -879,6 +1025,7 @@ export class Game {
       weapon: p ? p.weapon : WEAPONS[0],
       level: p ? p.level : 0,
       mult: this.scoreMult || 1,
+      difficulty: this.mode.id,
     };
   }
 
@@ -1003,55 +1150,67 @@ export class Game {
     const art = this.art;
     const bob = Math.sin(this.time * 6 + k.x * 0.05) * 2 * this.unit;
     const fade = k.life > k.maxLife - 3 ? 0.35 + 0.65 * Math.abs(Math.sin(this.time * 12)) : 1;
-    const key =
-      k.type === 'food'
-        ? 'drumstick'
-        : k.type === 'weapon'
-          ? 'giftWeapon'
-          : k.type === 'power'
-            ? 'giftPower'
-            : k.type === 'missile'
-              ? 'giftMissile'
-              : k.type === 'shield'
-                ? 'giftShield'
-                : 'giftLife';
+    const STATIC_KEYS = {
+      food: 'drumstick',
+      weapon: 'giftWeapon',
+      power: 'giftPower',
+      missile: 'giftMissile',
+      shield: 'giftShield',
+      life: 'giftLife',
+    };
+    const key = STATIC_KEYS[k.type] || `gift_${k.type}`;
 
     ctx.save();
     ctx.globalAlpha = fade;
     // Glow so pickups read against the starfield.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const glowColor =
-      k.type === 'food' ? 'rgba(255,190,110,0.5)'
-        : k.type === 'weapon' ? 'rgba(255,110,140,0.5)'
-          : k.type === 'power' ? 'rgba(110,240,150,0.5)'
-            : k.type === 'missile' ? 'rgba(130,160,255,0.5)'
-              : k.type === 'shield' ? 'rgba(110,230,240,0.5)'
-                : 'rgba(255,170,200,0.5)';
-    const g = ctx.createRadialGradient(k.x, k.y + bob, 0, k.x, k.y + bob, k.r * 2.1);
-    g.addColorStop(0, glowColor);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
+    const STATIC_GLOW = {
+      food: 'rgba(255,190,110,0.5)',
+      weapon: 'rgba(255,110,140,0.5)',
+      power: 'rgba(110,240,150,0.5)',
+      missile: 'rgba(130,160,255,0.5)',
+      shield: 'rgba(110,230,240,0.5)',
+      life: 'rgba(255,170,200,0.5)',
+    };
+    const glowColor = STATIC_GLOW[k.type] || `${POWERUPS[k.type].color}90`;
+    ctx.translate(k.x, k.y + bob);
+    const g = cachedGradient(`pickup|${k.type}|${k.r.toFixed(1)}`, () => {
+      const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, k.r * 2.1);
+      grd.addColorStop(0, glowColor);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      return grd;
+    });
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(k.x, k.y + bob, k.r * 2.1, 0, TAU);
+    ctx.arc(0, 0, k.r * 2.1, 0, TAU);
     ctx.fill();
     ctx.restore();
 
     art.draw(ctx, key, k.x, k.y + bob, k.rot, 1);
 
-    // Weapon gifts show which gun they carry.
+    // Gift boxes are labelled so players learn what each one does.
+    let label = null;
+    let labelColor = '#fff';
     if (k.type === 'weapon') {
       const wpn = WEAPONS.find((w) => w.id === k.weaponId);
       if (wpn) {
-        ctx.font = `900 ${Math.round(8.5 * this.unit)}px "Baloo 2", system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.lineWidth = 2.5 * this.unit;
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.strokeText(wpn.short, k.x, k.y + bob + k.r * 1.55);
-        ctx.fillStyle = wpn.color;
-        ctx.fillText(wpn.short, k.x, k.y + bob + k.r * 1.55);
+        label = wpn.short;
+        labelColor = wpn.color;
       }
+    } else if (POWERUPS[k.type]) {
+      label = POWERUPS[k.type].short;
+      labelColor = POWERUPS[k.type].color;
+    }
+    if (label) {
+      ctx.font = `900 ${Math.round(8.5 * this.unit)}px "Baloo 2", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 2.5 * this.unit;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(label, k.x, k.y + bob + k.r * 1.55);
+      ctx.fillStyle = labelColor;
+      ctx.fillText(label, k.x, k.y + bob + k.r * 1.55);
     }
     ctx.restore();
   }

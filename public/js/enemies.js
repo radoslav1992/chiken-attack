@@ -3,7 +3,7 @@
  * bonus UFOs and the boss chickens.
  */
 
-import { TAU, rand, randInt, chance, clamp, lerp, angleTo, easeOutCubic, pick } from './util.js';
+import { TAU, rand, randInt, chance, clamp, lerp, angleTo, easeOutCubic, pick, cachedGradient } from './util.js';
 import { sfx, vibrate } from './audio.js';
 
 /* ------------------------------------------------------------------- base -- */
@@ -288,9 +288,15 @@ export class Chicken extends Enemy {
     g.addScore(this.score, this.x, this.y);
     g.onEnemyKilled(this, source);
 
-    // Drumstick drop – the game's food economy.
-    if (chance(this.foodChance)) g.spawnPickup(this.x, this.y, 'food');
-    if (chance(0.035)) g.spawnPickup(this.x, this.y, g.rollGift());
+    // Drumstick drop – the game's food economy. Feast-wave birds are stuffed.
+    if (this.p.feast) {
+      g.spawnPickup(this.x, this.y, 'food');
+      g.spawnPickup(this.x + rand(14, -14) * g.unit, this.y, 'food');
+    } else if (chance(this.foodChance)) {
+      g.spawnPickup(this.x, this.y, 'food');
+    }
+    // Slightly more gifts than before, since the table now includes power-ups.
+    if (chance(0.05)) g.spawnPickup(this.x, this.y, g.rollGift());
   }
 
   draw(ctx, art, t) {
@@ -476,29 +482,29 @@ export class Ufo extends Enemy {
 
 /* ------------------------------------------------------------------- boss -- */
 
-const BOSS_NAMES = [
-  'MOTHER HEN',
-  'THE YOLK LORD',
-  'COLONEL CLUCK',
-  'IRON ROOSTER',
-  'THE OMELETTE KING',
-  'HENZILLA',
-];
-
-export class Boss extends Enemy {
-  constructor(game, wave) {
+/**
+ * Shared boss machinery: entrance, three-phase escalation, an attack scheduler
+ * and the drawn-out death. Subclasses supply stats, an attack pool and a body.
+ */
+class BossBase extends Enemy {
+  constructor(game, wave, cfg) {
     super(game);
-    const tier = Math.floor(wave / 5);
+    const tier = Math.max(1, Math.floor(wave / 5));
     this.tier = tier;
-    this.name = BOSS_NAMES[(tier - 1) % BOSS_NAMES.length] || BOSS_NAMES[0];
+    this.wave = wave;
     this.isBoss = true;
-    this.scale = 1 + Math.min(0.55, tier * 0.09);
-    this.r = 58 * game.unit * this.scale;
-    this.maxHp = Math.round((420 + wave * 130) * game.difficulty.bossHp);
+    this.name = cfg.name;
+    this.scale = cfg.scale;
+    this.r = cfg.r;
+    this.maxHp = Math.round(cfg.hp * game.difficulty.bossHp);
     this.hp = this.maxHp;
+    this.baseScore = cfg.score;
+    this.deathColor = cfg.deathColor || '#ffd166';
+    this.hitRadiusScale = cfg.hitRadiusScale ?? 0.78;
+    this.homeY = cfg.homeY;
+
     this.x = game.w * 0.5;
     this.y = -this.r * 1.4;
-    this.homeY = game.h * 0.2 + this.r * 0.2;
     this.vx = 0;
     this.vy = 0;
     this.age = 0;
@@ -509,10 +515,8 @@ export class Boss extends Enemy {
     this.attackT = 0;
     this.attackStep = 0;
     this.cooldown = 1.6;
-    this.baseScore = 6000 + wave * 700;
     this.phase = 1;
     this.canLay = false;
-    this.hitRadiusScale = 0.78;
     this.deathT = 0;
   }
 
@@ -522,6 +526,16 @@ export class Boss extends Enemy {
 
   get hpFrac() {
     return clamp(this.hp / this.maxHp, 0, 1);
+  }
+
+  /** Subclasses override for their own voice. */
+  roar() {
+    sfx.bossRoar();
+  }
+
+  /** Attack names per phase; `run_<name>(dt)` implements each. */
+  attackPools() {
+    return { 1: [], 2: [], 3: [] };
   }
 
   update(dt) {
@@ -535,11 +549,12 @@ export class Boss extends Enemy {
     const wasPhase = this.phase;
     this.phase = this.hpFrac > 0.66 ? 1 : this.hpFrac > 0.33 ? 2 : 3;
     if (this.phase !== wasPhase) {
-      sfx.bossRoar();
+      this.roar();
       g.shake(9);
       g.flash('rgba(255,120,60,0.35)');
       this.cooldown = 0.9;
       this.attack = null;
+      this.onPhaseChange();
       g.fx.shockwave(this.x, this.y, 220 * u, 'rgba(255,180,120,0.9)', 0.7, 6);
     }
 
@@ -548,7 +563,7 @@ export class Boss extends Enemy {
       if (Math.abs(this.y - this.homeY) < 4 * u) {
         this.state = 'fight';
         this.stateT = 0;
-        sfx.bossRoar();
+        this.roar();
         g.shake(8);
       }
       return;
@@ -564,7 +579,7 @@ export class Boss extends Enemy {
           this.x + Math.cos(a) * this.r * 0.7,
           this.y + Math.sin(a) * this.r * 0.7,
           1.1,
-          '#ffb703'
+          this.deathColor
         );
         sfx.explosion(1.1);
         g.shake(4);
@@ -586,15 +601,16 @@ export class Boss extends Enemy {
     this[`run_${this.attack}`](dt);
   }
 
+  onPhaseChange() {}
+
   startAttack() {
-    const pools = {
-      1: ['volley', 'sweep', 'summon'],
-      2: ['volley', 'ring', 'charge', 'summon', 'feathers'],
-      3: ['ring', 'charge', 'volley', 'feathers', 'stomp', 'summon'],
-    };
-    const pool = pools[this.phase];
+    const pool = this.attackPools()[this.phase];
+    if (!pool || !pool.length) {
+      this.cooldown = 1;
+      return;
+    }
     let next = pick(pool);
-    if (next === this.lastAttack) next = pick(pool);
+    if (next === this.lastAttack && pool.length > 1) next = pick(pool);
     this.lastAttack = next;
     this.attack = next;
     this.attackT = 0;
@@ -604,6 +620,102 @@ export class Boss extends Enemy {
   endAttack(cooldown = 1.2) {
     this.attack = null;
     this.cooldown = cooldown / this.game.difficulty.bossRate;
+  }
+
+  /* --- damage / death --------------------------------------------------- */
+
+  hurt(dmg, source) {
+    if (this.state === 'dying' || this.state === 'enter') return false;
+    return super.hurt(dmg, source);
+  }
+
+  die() {
+    if (this.state === 'dying') return;
+    this.state = 'dying';
+    this.deathT = 0;
+    this.attack = null;
+    this.hp = 0;
+    const g = this.game;
+    sfx.bigExplosion();
+    g.shake(12);
+    g.onBossDying(this);
+  }
+
+  /** Debris flavour, overridden per boss. */
+  deathDebris() {
+    this.game.fx.feathers(this.x, this.y, 40);
+  }
+
+  finishDeath() {
+    const g = this.game;
+    this.dead = true;
+    g.fx.explosion(this.x, this.y, 4.5, this.deathColor);
+    this.deathDebris();
+    g.fx.shockwave(this.x, this.y, g.w, 'rgba(255,240,200,0.95)', 0.9, 9);
+    g.shake(18);
+    g.flash('rgba(255,255,255,0.55)');
+    sfx.bigExplosion();
+    vibrate([60, 40, 120]);
+    g.addScore(this.score, this.x, this.y);
+    // A shower of drumsticks and gifts.
+    for (let i = 0; i < 22; i++) {
+      g.spawnPickup(this.x + rand(120, -120) * g.unit, this.y + rand(70, -70) * g.unit, 'food');
+    }
+    for (let i = 0; i < 3; i++) {
+      g.spawnPickup(this.x + rand(90, -90) * g.unit, this.y + rand(40, -40) * g.unit, g.rollGift(true));
+    }
+    g.onEnemyKilled(this, null);
+  }
+
+  /** Red glow once the boss is on its last third. */
+  drawRage(ctx) {
+    if (this.phase !== 3 || this.state !== 'fight') return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g2 = ctx.createRadialGradient(this.x, this.y, this.r * 0.6, this.x, this.y, this.r * 1.5);
+    g2.addColorStop(0, 'rgba(255,80,60,0.35)');
+    g2.addColorStop(1, 'rgba(255,60,40,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * 1.5, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* ----------------------------------------------------------- boss: the hen -- */
+
+const BOSS_NAMES = [
+  'MOTHER HEN',
+  'THE YOLK LORD',
+  'COLONEL CLUCK',
+  'IRON ROOSTER',
+  'THE OMELETTE KING',
+  'HENZILLA',
+];
+
+export class Boss extends BossBase {
+  constructor(game, wave) {
+    const tier = Math.max(1, Math.floor(wave / 5));
+    const scale = 1 + Math.min(0.55, tier * 0.09);
+    super(game, wave, {
+      name: BOSS_NAMES[(Math.ceil(tier / 2) - 1) % BOSS_NAMES.length],
+      scale,
+      r: 58 * game.unit * scale,
+      hp: 420 + wave * 130,
+      score: 6000 + wave * 700,
+      homeY: game.h * 0.2 + 58 * game.unit * scale * 0.2,
+      hitRadiusScale: 0.78,
+      deathColor: '#ffd166',
+    });
+  }
+
+  attackPools() {
+    return {
+      1: ['volley', 'sweep', 'summon'],
+      2: ['volley', 'ring', 'charge', 'summon', 'feathers'],
+      3: ['ring', 'charge', 'volley', 'feathers', 'stomp', 'summon'],
+    };
   }
 
   /* --- attacks --------------------------------------------------------- */
@@ -806,45 +918,7 @@ export class Boss extends Enemy {
     if (this.attackT > dur) this.endAttack(1.0);
   }
 
-  /* --- damage / death --------------------------------------------------- */
-
-  hurt(dmg, source) {
-    if (this.state === 'dying' || this.state === 'enter') return false;
-    return super.hurt(dmg, source);
-  }
-
-  die() {
-    if (this.state === 'dying') return;
-    this.state = 'dying';
-    this.deathT = 0;
-    this.attack = null;
-    this.hp = 0;
-    const g = this.game;
-    sfx.bigExplosion();
-    g.shake(12);
-    g.onBossDying(this);
-  }
-
-  finishDeath() {
-    const g = this.game;
-    this.dead = true;
-    g.fx.explosion(this.x, this.y, 4.5, '#ffd166');
-    g.fx.feathers(this.x, this.y, 40);
-    g.fx.shockwave(this.x, this.y, g.w, 'rgba(255,240,200,0.95)', 0.9, 9);
-    g.shake(18);
-    g.flash('rgba(255,255,255,0.55)');
-    sfx.bigExplosion();
-    vibrate([60, 40, 120]);
-    g.addScore(this.score, this.x, this.y);
-    // Feast: a shower of drumsticks and gifts.
-    for (let i = 0; i < 22; i++) {
-      g.spawnPickup(this.x + rand(120, -120) * g.unit, this.y + rand(70, -70) * g.unit, 'food');
-    }
-    for (let i = 0; i < 3; i++) {
-      g.spawnPickup(this.x + rand(90, -90) * g.unit, this.y + rand(40, -40) * g.unit, g.rollGift(true));
-    }
-    g.onEnemyKilled(this, null);
-  }
+  /* --- paint ------------------------------------------------------------ */
 
   /** A crown marks the boss as royalty (and reads at a glance on a phone). */
   drawCrown(ctx) {
@@ -880,33 +954,347 @@ export class Boss extends Enemy {
     ctx.restore();
   }
 
-  draw(ctx, art, t) {
-    const u = this.game.unit;
+  draw(ctx, art) {
     const frame = Math.floor(this.wobble) % 3;
     const squash = this.state === 'dying' ? 1 + Math.sin(this.deathT * 22) * 0.06 : 1;
     ctx.save();
     if (this.state === 'dying') {
       ctx.globalAlpha = 0.85 + Math.sin(this.deathT * 30) * 0.15;
     }
-    // Angry aura in the final phase.
-    if (this.phase === 3 && this.state === 'fight') {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const g2 = ctx.createRadialGradient(this.x, this.y, this.r * 0.6, this.x, this.y, this.r * 1.5);
-      g2.addColorStop(0, 'rgba(255,80,60,0.35)');
-      g2.addColorStop(1, 'rgba(255,60,40,0)');
-      ctx.fillStyle = g2;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r * 1.5, 0, TAU);
-      ctx.fill();
-      ctx.restore();
-    }
+    this.drawRage(ctx);
     art.draw(ctx, 'chicken_boss', this.x, this.y, Math.sin(this.age * 1.4) * 0.06, this.scale * squash, 1, frame);
     this.drawCrown(ctx);
     if (this.flash > 0) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = this.flash * 0.6;
       art.draw(ctx, 'chicken_boss', this.x, this.y, 0, this.scale * squash, 1, frame);
+    }
+    ctx.restore();
+  }
+}
+
+/* -------------------------------------------------------- boss: mothership -- */
+
+const SHIP_NAMES = [
+  'THE HENPEROR',
+  'YOLK-STAR',
+  'EGG CARRIER',
+  'HENTERPRISE',
+  'THE INCUBATOR',
+  'COOP COMMAND',
+];
+
+/**
+ * The chicken air force's flagship: a wide saucer that fires a sweeping cutting
+ * beam, launches chickens from its bays and lobs plasma yolk.
+ */
+export class Mothership extends BossBase {
+  constructor(game, wave) {
+    const tier = Math.max(1, Math.floor(wave / 5));
+    const scale = 1 + Math.min(0.5, tier * 0.08);
+    super(game, wave, {
+      name: SHIP_NAMES[(Math.floor(tier / 2) - 1 + SHIP_NAMES.length) % SHIP_NAMES.length],
+      scale,
+      r: 62 * game.unit * scale,
+      hp: 470 + wave * 140,
+      score: 6500 + wave * 780,
+      homeY: game.h * 0.17 + 20 * game.unit,
+      hitRadiusScale: 0.7,
+      deathColor: '#8fe6ff',
+    });
+    // Cutting beam state: null, or { x, w, t, firing }.
+    this.beam = null;
+    this.bayOpen = 0;
+    this.spin = 0;
+  }
+
+  roar() {
+    sfx.siren();
+  }
+
+  attackPools() {
+    return {
+      1: ['orbs', 'bays', 'wall'],
+      2: ['beam', 'orbs', 'bays', 'wall'],
+      3: ['beam', 'orbs', 'wall', 'bays', 'mines'],
+    };
+  }
+
+  update(dt) {
+    this.spin += dt * (1.2 + this.phase * 0.5);
+    this.bayOpen = lerp(this.bayOpen, this.attack === 'bays' ? 1 : 0, dt * 6);
+    super.update(dt);
+    if (this.state !== 'fight') this.beam = null;
+    this.updateBeam(dt);
+  }
+
+  /* --- attacks --------------------------------------------------------- */
+
+  /** Telegraphed vertical cutting beam that sweeps sideways. */
+  run_beam(dt) {
+    const g = this.game;
+    const warn = 0.9;
+    const fire = 1.5 + this.phase * 0.25;
+    if (!this.beam) {
+      const p = g.player;
+      this.beam = {
+        x: p && !p.dead ? p.x : g.w * 0.5,
+        w: (26 + this.phase * 5) * g.unit,
+        t: 0,
+        firing: false,
+        dir: (p && p.x > g.w * 0.5 ? -1 : 1),
+      };
+      sfx.beamCharge();
+    }
+    const b = this.beam;
+    b.t += dt;
+    if (!b.firing) {
+      // Track the player during the wind-up, then lock and fire.
+      const p = g.player;
+      if (p && !p.dead) b.x = lerp(b.x, p.x, 1 - Math.pow(0.02, dt));
+      if (b.t >= warn) {
+        b.firing = true;
+        b.t = 0;
+        sfx.beamFire();
+        g.shake(6);
+      }
+    } else {
+      b.x += b.dir * 90 * g.unit * dt * (0.8 + this.phase * 0.25);
+      if (b.x < b.w) b.dir = 1;
+      if (b.x > g.w - b.w) b.dir = -1;
+      if (b.t >= fire) {
+        this.beam = null;
+        this.endAttack(1.35);
+        return;
+      }
+    }
+    this.x = lerp(this.x, b.x, 1 - Math.pow(0.25, dt));
+    this.y = lerp(this.y, this.homeY, 1 - Math.pow(0.3, dt));
+  }
+
+  /** Beam damage + shimmer, evaluated every frame so it also runs while dying. */
+  updateBeam(dt) {
+    const g = this.game;
+    const b = this.beam;
+    if (!b) return;
+    if (!b.firing) return;
+    const p = g.player;
+    if (p && !p.dead && p.invuln <= 0 && p.y > this.y) {
+      if (Math.abs(p.x - b.x) < b.w * 0.5 + p.r * 0.4) g.damagePlayer();
+    }
+    // Sparks where the beam meets the bottom of the screen.
+    if (chance(0.6)) {
+      g.fx.spark(b.x + rand(b.w * 0.4, -b.w * 0.4), g.h - 4 * g.unit, {
+        color: '#a5f3ff',
+        vy: rand(-60, -220) * g.unit,
+        vx: rand(80, -80) * g.unit,
+        size: rand(3, 1.5),
+      });
+    }
+  }
+
+  /** Launch bays disgorge chickens from both sides. */
+  run_bays(dt) {
+    const g = this.game;
+    if (this.attackStep === 0 && this.attackT > 0.55) {
+      const n = 2 + this.phase;
+      for (let side of [-1, 1]) {
+        for (let i = 0; i < n; i++) {
+          g.addEnemy(
+            new Chicken(g, {
+              breed: this.phase > 2 && chance(0.4) ? 'metal' : chance(0.5) ? 'brown' : 'white',
+              mode: 'chase',
+              x: this.x + side * this.r * 0.62,
+              y: this.y + this.r * 0.25,
+              canLay: true,
+              speed: 62 + this.tier * 7 + i * 6,
+            })
+          );
+        }
+      }
+      sfx.bayOpen();
+      g.fx.burst(this.x, this.y + this.r * 0.3, 14, { color: '#8fe6ff', speed: 150 });
+      this.attackStep = 1;
+    }
+    this.x = lerp(this.x, g.w * 0.5, 1 - Math.pow(0.4, dt));
+    if (this.attackT > 1.7) this.endAttack(1.25);
+  }
+
+  /** Spiralling plasma yolks. */
+  run_orbs(dt) {
+    const g = this.game;
+    const shots = 8 + this.phase * 4;
+    const step = 0.12;
+    while (this.attackStep < shots && this.attackT > this.attackStep * step) {
+      const a = Math.PI / 2 + Math.sin(this.attackStep * 0.55) * (0.7 + this.phase * 0.2);
+      const speed = 210 * g.unit * g.difficulty.eggSpeed;
+      g.spawnEgg(this.x, this.y + this.r * 0.3, {
+        vx: Math.cos(a) * speed,
+        vy: Math.abs(Math.sin(a)) * speed,
+        kind: 'orb',
+      });
+      this.attackStep += 1;
+    }
+    this.x = lerp(this.x, g.w * 0.5 + Math.sin(this.age * 1.1) * g.w * 0.24, 1 - Math.pow(0.5, dt));
+    if (this.attackStep >= shots && this.attackT > shots * step + 0.3) this.endAttack(1.2);
+  }
+
+  /** A wall of eggs with a single gap to fly through. */
+  run_wall(dt) {
+    const g = this.game;
+    const rows = 1 + this.phase;
+    const step = 0.75;
+    while (this.attackStep < rows && this.attackT > this.attackStep * step) {
+      const slots = 7;
+      const gap = Math.floor(rand(slots));
+      for (let i = 0; i < slots; i++) {
+        if (i === gap || i === gap + 1) continue;
+        g.spawnEgg((i + 0.5) * (g.w / slots), this.y + this.r * 0.4, {
+          vx: 0,
+          vy: 150 * g.unit * g.difficulty.eggSpeed,
+          kind: 'egg',
+        });
+      }
+      sfx.eggDrop();
+      this.attackStep += 1;
+    }
+    this.y = lerp(this.y, this.homeY, 1 - Math.pow(0.3, dt));
+    if (this.attackStep >= rows && this.attackT > rows * step + 0.4) this.endAttack(1.15);
+  }
+
+  /** Slow drifting mines that fall the full height of the screen. */
+  run_mines(dt) {
+    const g = this.game;
+    if (this.attackStep === 0 && this.attackT > 0.35) {
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        g.spawnEgg(rand(g.w * 0.9, g.w * 0.1), this.y + this.r * 0.3, {
+          vx: rand(30, -30) * g.unit,
+          vy: 70 * g.unit,
+          kind: 'bigEgg',
+        });
+      }
+      sfx.eggDrop();
+      this.attackStep = 1;
+    }
+    if (this.attackT > 1.2) this.endAttack(1.1);
+  }
+
+  onPhaseChange() {
+    this.beam = null;
+  }
+
+  deathDebris() {
+    const g = this.game;
+    g.fx.burst(this.x, this.y, 26, {
+      speed: 260,
+      size: 5,
+      life: 1.1,
+      color: ['#8fe6ff', '#cfd8e3', '#5d6b7d'],
+      type: 'goo',
+      gravity: 120,
+    });
+    g.fx.feathers(this.x, this.y, 16);
+  }
+
+  /* --- paint ------------------------------------------------------------ */
+
+  draw(ctx, art, t) {
+    const u = this.game.unit;
+    ctx.save();
+    if (this.state === 'dying') ctx.globalAlpha = 0.85 + Math.sin(this.deathT * 30) * 0.15;
+    this.drawBeam(ctx);
+    this.drawRage(ctx);
+
+    // Open bay doors slide out from under the hull.
+    if (this.bayOpen > 0.02) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(30,40,60,0.9)';
+      for (const side of [-1, 1]) {
+        const w = this.r * 0.42 * this.bayOpen;
+        ctx.beginPath();
+        ctx.ellipse(this.x + side * this.r * 0.58, this.y + this.r * 0.3, w, this.r * 0.12, 0, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    art.draw(ctx, 'mothership', this.x, this.y, Math.sin(this.age * 0.9) * 0.05, this.scale, 1);
+
+    // Rotating running lights around the rim.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 7; i++) {
+      const a = this.spin + (i / 7) * TAU;
+      const lx = this.x + Math.cos(a) * this.r * 0.86;
+      const ly = this.y + this.r * 0.26 + Math.sin(a) * this.r * 0.1;
+      const pulse = 0.4 + 0.6 * Math.max(0, Math.sin(a));
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = cachedGradient(`rimlight|${this.r.toFixed(1)}`, () => {
+        const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, this.r * 0.16);
+        grd.addColorStop(0, 'rgba(255,225,140,0.9)');
+        grd.addColorStop(1, 'rgba(255,200,80,0)');
+        return grd;
+      });
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r * 0.16, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    if (this.flash > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = this.flash * 0.6;
+      art.draw(ctx, 'mothership', this.x, this.y, 0, this.scale, 1);
+    }
+    ctx.restore();
+  }
+
+  drawBeam(ctx) {
+    const b = this.beam;
+    if (!b) return;
+    const g = this.game;
+    const top = this.y + this.r * 0.2;
+    ctx.save();
+    if (!b.firing) {
+      // Telegraph: a thin dashed guide plus a charging glow at the emitter.
+      const k = b.t / 0.9;
+      ctx.globalAlpha = 0.35 + 0.35 * Math.abs(Math.sin(b.t * 22));
+      ctx.strokeStyle = '#ff8787';
+      ctx.lineWidth = 2 * g.unit;
+      ctx.setLineDash([10 * g.unit, 10 * g.unit]);
+      ctx.beginPath();
+      ctx.moveTo(b.x, top);
+      ctx.lineTo(b.x, g.h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'lighter';
+      const cg = ctx.createRadialGradient(b.x, top, 0, b.x, top, this.r * 0.5 * (0.4 + k));
+      cg.addColorStop(0, 'rgba(255,255,255,0.9)');
+      cg.addColorStop(0.4, 'rgba(160,240,255,0.7)');
+      cg.addColorStop(1, 'rgba(120,200,255,0)');
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(b.x, top, this.r * 0.5 * (0.4 + k), 0, TAU);
+      ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = 'lighter';
+      const flicker = 0.85 + Math.sin(b.t * 40) * 0.15;
+      const w = b.w * flicker;
+      const grd = ctx.createLinearGradient(b.x - w, 0, b.x + w, 0);
+      grd.addColorStop(0, 'rgba(120,200,255,0)');
+      grd.addColorStop(0.35, 'rgba(140,230,255,0.55)');
+      grd.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+      grd.addColorStop(0.65, 'rgba(140,230,255,0.55)');
+      grd.addColorStop(1, 'rgba(120,200,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(b.x - w, top, w * 2, g.h - top);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(b.x - w * 0.12, top, w * 0.24, g.h - top);
     }
     ctx.restore();
   }

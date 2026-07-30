@@ -302,6 +302,60 @@ body {
   display: none !important;
 }
 
+/* -------------------------------------------------------------- difficulty */
+
+.btn-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.difficulty {
+  margin-top: 4px;
+}
+
+.difficulty-options {
+  display: flex;
+  gap: 8px;
+}
+
+.difficulty-options button {
+  flex: 1;
+  min-height: 46px;
+  padding: 8px 6px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-line);
+  background: rgba(18, 24, 46, 0.78);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+
+.difficulty-options button:active {
+  transform: translateY(2px);
+}
+
+.difficulty-options button[aria-pressed="true"] {
+  background: linear-gradient(180deg, #ffe9a8, #ffc046);
+  color: #2b1a05;
+  border-color: transparent;
+}
+
+.difficulty-blurb {
+  margin: 8px 0 0;
+  min-height: 2.6em;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 /* ------------------------------------------------------------------- sheets */
 
 .sheet {
@@ -377,6 +431,24 @@ body {
 }
 .c-life {
   color: #ffa8c5;
+}
+.c-drones {
+  color: #a5d8ff;
+}
+.c-rapid {
+  color: #ffd166;
+}
+.c-magnet {
+  color: #ff8787;
+}
+.c-double {
+  color: #ffe066;
+}
+.c-warp {
+  color: #c792ff;
+}
+.c-nuke {
+  color: #ff6b6b;
 }
 
 /* ------------------------------------------------------------------ toggles */
@@ -477,8 +549,8 @@ body {
 
 .score-list li {
   display: grid;
-  grid-template-columns: 26px 1fr auto auto;
-  gap: 10px;
+  grid-template-columns: 22px 1fr auto auto auto;
+  gap: 8px;
   align-items: center;
   padding: 10px 12px;
   border-radius: 12px;
@@ -509,6 +581,34 @@ body {
   text-align: center;
   color: var(--muted);
   font-size: 14px;
+}
+
+/* --------------------------------------------------------- lifetime stats */
+
+.lifetime {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.lifetime > div {
+  text-align: center;
+}
+
+.lifetime dt {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lifetime dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 900;
 }
 
 /* ---------------------------------------------------------------- game over */
@@ -545,6 +645,71 @@ body {
 .result-grid b {
   font-size: 19px;
   font-weight: 900;
+}
+
+/* ------------------------------------------------------------- name entry */
+
+.name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name-label {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.name-row {
+  display: flex;
+  gap: 8px;
+}
+
+.name-input {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-line);
+  background: rgba(8, 12, 26, 0.9);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.name-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.name-save {
+  flex: 0 0 96px;
+  min-height: 48px;
+}
+
+.score-list .diff {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+}
+
+.score-list .diff.is-superstar {
+  background: rgba(255, 107, 157, 0.22);
+  color: #ffb3cd;
+}
+
+.score-list .diff.is-rookie {
+  background: rgba(105, 219, 124, 0.18);
+  color: #a9e6b4;
 }
 
 /* ---------------------------------------------------------------------- hud */
@@ -680,6 +845,11 @@ body {
 @media (orientation: landscape) and (max-height: 520px) {
   .menu-inner {
     max-width: 620px;
+  }
+  /* Trim the chrome so the whole menu fits without scrolling. */
+  .kicker,
+  .difficulty-blurb {
+    display: none;
   }
   .title-line-1 {
     font-size: 34px;

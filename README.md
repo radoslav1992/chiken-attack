@@ -1,8 +1,9 @@
 # Chicken Attack
 
 A mobile-first, installable PWA arcade shooter in the spirit of *Chicken Invaders*: waves of
-invading space poultry, drumsticks to hoover up, nine upgradeable weapons and a boss hen every
-fifth wave. One landing page, one **Start Game** button, no build step, fully playable offline.
+invading space poultry, drumsticks to hoover up, nine upgradeable weapons and a boss every fifth
+wave. One landing page, one **Start Game** button, no build step, fully playable offline — and a run
+interrupted by a closed tab is offered back to you the next time you open it.
 
 Everything — sprites, sound effects, music and icons — is generated procedurally at runtime
 (Canvas2D + Web Audio), so the whole game is a handful of text files and five small PNGs.
@@ -79,6 +80,19 @@ installed clients pick the new bundle up on their next visit.
 
 ## Features
 
+**Modes & progression**
+
+- Three difficulties — Rookie (five ships, gentle eggs), Veteran, Superstar (two ships, ×1.6 score)
+  — picked on the landing page and recorded with each high score.
+- Runs autosave at every wave boundary: reopen the game and **Continue** picks up the wave, score,
+  ships, weapon, power level, missiles and drumsticks. Works offline too.
+- Endless escalating waves with a per-wave curve (health, speed, egg rate, egg speed) on top of the
+  difficulty multipliers.
+- Drumstick economy: 100 drumsticks earn an extra life. Combo multiplier up to ×5, wave-clear
+  bonuses for accuracy and remaining lives, top-10 local table with name entry and lifetime stats.
+- Timed power-ups (see below) drop alongside the permanent upgrades. Buffs are deliberately not
+  part of the autosave — a resumed run restarts the wave without them.
+
 **Combat**
 
 - Nine weapons with distinct behaviour and 10 power levels each: Ion Blaster, Neutron Gun,
@@ -95,17 +109,34 @@ installed clients pick the new bundle up on their next visit.
 - Nine wave archetypes on rotation, including ASCII-art formations (heart, skull, arrow, egg,
   star, wings, invader), asteroid belts with rocks that shatter into shards, and bonus UFOs that
   always drop a gift.
-- Boss hen every fifth wave: crowned, phase-based (three phases with a health bar), with egg
-  volleys, radial egg rings, sweeping bombing runs, charges, ground stomps, feather storms and
-  chick summons. Six named bosses on rotation, scaling with the wave.
-
-**Progression**
-
-- Endless escalating waves with a per-wave difficulty curve (health, speed, egg rate, egg speed).
-- Drumstick economy: 100 drumsticks earn an extra life.
+- Every seventh non-boss wave is a **feast**: drumsticks and gifts rain down, nothing shoots back.
 - Gifts: weapon swap, +power, missiles, shield and extra life.
-- Combo multiplier up to ×5, wave-clear bonuses for accuracy and remaining lives, top-10 local
-  high-score table.
+
+**Power-ups**
+
+Timed boosts drop as labelled gift boxes and show a countdown ring in the HUD (glyph, plus the
+seconds remaining once under ten). Collecting one you already have refreshes its timer.
+
+| Power-up | Effect | Duration |
+| --- | --- | --- |
+| Wing Drones | Two escort drones fire your current weapon, a little slower and one power level down | 22 s |
+| Overdrive | Weapon cooldown cut to 55% — measured at ~1.7x the shot rate | 12 s |
+| Drumstick Magnet | Food and gifts home in from across the screen | 16 s |
+| Golden Egg | Doubles every point scored, on top of the combo and difficulty multipliers | 20 s |
+| Time Warp | Chickens, eggs and formations run at 45% speed; your ship and bullets do not | 9 s |
+| Pressure Cooker | Instant: scrambles every egg in flight and damages everything on screen (bosses take 55%) | — |
+
+**Bosses**
+
+Two archetypes alternate every fifth wave, both with three escalating phases and a health bar:
+
+- **The giant hen** — crowned, with egg volleys, radial egg rings, sweeping bombing runs, charges
+  that bounce off the walls, ground stomps and chick summons.
+- **The chicken mothership** — a saucer with a pilot hen in the dome that fires a telegraphed
+  cutting beam (dashed guide first, then a sweeping column), opens launch bays to disgorge escorts,
+  lobs spiralling plasma yolks, drops walls of eggs with a single gap and scatters slow mines.
+
+Twelve named bosses in total, scaling with the wave.
 
 **Presentation & platform**
 
@@ -115,8 +146,12 @@ installed clients pick the new bundle up on their next visit.
   variant during boss fights.
 - Portrait-first layout, safe-area aware; wide screens (landscape, tablet, desktop) letterbox to a
   centred playfield with the HUD hugging its edge.
-- Haptics, pause on tab switch, settings persisted to `localStorage`, PWA install prompt, offline
-  service worker.
+- Haptics, pause on tab switch (with a 3-2-1 countdown on resume so nobody unpauses into an egg),
+  settings persisted to `localStorage`, PWA install prompt, offline service worker.
+- Respects `prefers-reduced-motion` — no screen shake, no slow-motion death, dimmed flashes — plus
+  a manual screen-shake toggle in settings.
+- Gradients for bullets, pickups and boss lights are cached in local space rather than rebuilt per
+  object per frame; that alone lifted the worst-case wave from ~20 fps to a steady 60.
 
 ## Layout
 
@@ -135,6 +170,7 @@ public/                    the deployable site — nothing else is uploaded
   js/enemies.js            chickens, asteroids, UFOs, bosses
   js/waves.js              formations, wave archetypes, difficulty curve
   js/weapons.js            weapon table + projectile rendering
+  js/powerups.js           timed power-up table and tuning constants
   js/effects.js            pooled particles, shockwaves, floating text
   js/hud.js                in-canvas HUD, boss bar, banners
   js/art.js                procedural sprite pre-rendering + starfield
