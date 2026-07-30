@@ -4,6 +4,8 @@ interface Props {
   variant?: 'landing' | 'game';
 }
 
+import Brand from './Brand.astro';
+
 const { variant = 'landing' } = Astro.props;
 const home = variant === 'landing' ? '#top' : '/';
 ---
@@ -11,8 +13,7 @@ const home = variant === 'landing' ? '#top' : '/';
 <header class="site-header">
   <div class="wrap site-header-inner">
     <a href={home} class="brand">
-      <span class="brand-mark">B</span>
-      <span class="brand-name">BEAVER GAMES</span>
+      <Brand size={38} />
     </a>
     {
       variant === 'landing' ? (

@@ -1,4 +1,5 @@
 ---
+import Brand from './Brand.astro';
 interface Props {
   variant?: 'landing' | 'game';
 }
@@ -14,8 +15,7 @@ const anchor = (hash: string) => (variant === 'landing' ? hash : `/${hash}`);
         <div class="wrap footer-grid">
           <div>
             <div class="footer-brand">
-              <span class="footer-brand-mark">B</span>
-              <span class="footer-brand-name">BEAVER GAMES</span>
+              <Brand size={40} />
             </div>
             <p class="footer-tag">
               Built for browsers, not launchers.

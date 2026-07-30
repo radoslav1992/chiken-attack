@@ -108,6 +108,22 @@ tools/make-beaver-icons.mjs Beaver Dash icon set
 tools/make-orbit-icons.mjs  Orbit Cadet icon set   (npm run icons runs all three)
 ```
 
+## The brand mark
+
+`src/components/Brand.astro` renders the logo image if one is in `public/media/`, and a CSS
+fallback in the same palette if not. It checks at build time — Astro components run in Node — so
+adding the logo is the whole job:
+
+```bash
+cp your-logo.png public/media/beaver-games-logo.png
+npm run build
+```
+
+Every header and footer picks it up with no code change. `beaver-games-logo.{png,webp,svg}` and
+`logo.{png,svg}` are all accepted, first match wins. A build-time check rather than an `onerror`
+attribute because the site's CSP forbids inline handlers, and it means there is never a 404 for a
+logo that has not been added yet.
+
 ## Notes that save debugging time
 
 - **CSP**: the site ships `script-src 'self'; style-src 'self'` — no `unsafe-inline`. Astro is
