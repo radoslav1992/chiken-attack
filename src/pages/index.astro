@@ -1,0 +1,322 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Leaderboard from '../components/Leaderboard.astro';
+import { GAMES, PLAYABLE } from '../data/games.js';
+
+const featured = PLAYABLE[0];
+const genres = ['All', ...new Set(GAMES.map((g) => g.genre))];
+const tickerItems = ['INSTANT PLAY', 'NO SIGN-UP', 'NO ADS', 'WORKS OFFLINE', 'FREE FOREVER', 'NEW CABINETS COMING'];
+---
+
+<Layout title="Beaver Games — no downloads, just press start">
+  <div id="top"></div>
+  <Header variant="landing" />
+
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="wrap hero-inner">
+      <div>
+        <div class="hero-badge">
+          <span class="blink-dot"></span>
+          <span class="hero-badge-text">FREE FOREVER · NO ADS</span>
+        </div>
+        <h1 class="hero-title">
+          NO DOWNLOADS.<br /><span class="accent-amber">JUST</span>{' '}<span class="accent-red">PRESS</span><br />START.
+        </h1>
+        <p class="hero-copy">
+          Hand-picked browser games that load in under a second. Works on the school laptop, the
+          work machine, and that ancient tablet in the kitchen drawer.
+        </p>
+        <div class="hero-ctas">
+          <a href={`/games/${featured.slug}/`} class="btn-pixel btn-amber-lg">▶ PLAY {featured.title.toUpperCase()}</a>
+          <a href="#catalog" class="btn-ghost">Browse the arcade</a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="stat-num">&lt;1s</div>
+            <div class="stat-label">Load time</div>
+          </div>
+          <div>
+            <div class="stat-num">0.4MB</div>
+            <div class="stat-label">Biggest game</div>
+          </div>
+          <div>
+            <div class="stat-num">0</div>
+            <div class="stat-label">Ads, ever</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-cabinet">
+        <div class="cabinet-frame">
+          <div class="cabinet-lights">
+            <span class="cabinet-light is-red"></span>
+            <span class="cabinet-light is-amber"></span>
+            <span class="cabinet-light is-teal"></span>
+            <span class="cabinet-tag">CABINET 01</span>
+          </div>
+          <div class="cabinet-screen">
+            <img src={featured.stageArt} alt={`${featured.title} gameplay`} loading="eager" />
+          </div>
+          <div class="cabinet-bar">
+            <div>
+              <div class="cabinet-title">{featured.title.toUpperCase()}</div>
+              <div class="cabinet-sub">{featured.genre} · plays in your browser</div>
+            </div>
+            <a href={`/games/${featured.slug}/`} class="btn-pixel btn-teal">START</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      {
+        [0, 1].map(() => (
+          <div class="ticker-group">
+            {tickerItems.map((item) => (
+              <span>★ {item}</span>
+            ))}
+            {tickerItems.map((item) => (
+              <span>★ {item}</span>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <section class="wrap section">
+    <div class="kicker-row">
+      <span class="kicker is-red">GAME OF THE WEEK</span>
+      <span class="kicker-rule"></span>
+    </div>
+    <div class="spotlight">
+      <div class="spotlight-art">
+        <img src={featured.art} alt={`${featured.title} key art`} loading="lazy" />
+      </div>
+      <div>
+        <h2 class="spotlight-title">
+          CHICKEN <span class="accent-red">ATTACK</span>
+        </h2>
+        <p class="spotlight-copy">{featured.blurb} Autosaves between waves, installs as an app if you want it to, and keeps working with no connection at all.</p>
+        <div class="spotlight-stats">
+          <div class="mini-stat">
+            <div class="mini-stat-num">9</div>
+            <div class="mini-stat-label">Weapons</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-stat-num">{featured.stats.runTime}</div>
+            <div class="mini-stat-label">Per run</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-stat-num">{featured.stats.size}</div>
+            <div class="mini-stat-label">Download</div>
+          </div>
+        </div>
+        <a href={`/games/${featured.slug}/`} class="btn-pixel btn-red-lg">▶ OPEN GAME PAGE</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="catalog" class="wrap section-catalog">
+    <div class="catalog-head">
+      <div>
+        <h2 class="h2">THE ARCADE</h2>
+        <p class="catalog-sub">Pick a cabinet. Every one opens straight into a game page.</p>
+      </div>
+      <div class="genre-filters" data-genre-filters>
+        {
+          genres.map((g, i) => (
+            <button type="button" class="genre-btn" data-genre={g} aria-pressed={i === 0 ? 'true' : 'false'}>
+              {g}
+            </button>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="game-grid" data-game-grid>
+      {
+        GAMES.map((game) =>
+          game.playable ? (
+            <a href={`/games/${game.slug}/`} class="game-card" data-genre={game.genre}>
+              <div class="game-card-screen">
+                <img src={game.art} alt={`${game.title} art`} loading="lazy" />
+                <span class="game-card-badge">{game.badge}</span>
+              </div>
+              <div class="game-card-row">
+                <span class="game-card-title">{game.title}</span>
+                <span class="game-card-note">Play free</span>
+              </div>
+              <div class="game-card-genre">{game.genre}</div>
+            </a>
+          ) : (
+            <div class="game-card is-soon" data-genre={game.genre} aria-disabled="true">
+              <div class="game-card-screen">
+                <span class="game-card-screen-empty">?</span>
+                <span class="game-card-badge">{game.badge}</span>
+              </div>
+              <div class="game-card-row">
+                <span class="game-card-title">{game.title}</span>
+                <span class="game-card-note">In the workshop</span>
+              </div>
+              <div class="game-card-genre">{game.genre}</div>
+            </div>
+          )
+        )
+      }
+    </div>
+  </section>
+
+  <section id="why" class="why">
+    <div class="wrap why-inner">
+      <h2 class="why-title">
+        GAMES THE WAY THEY <span class="accent-amber">USED TO BE</span>
+      </h2>
+      <div class="why-grid">
+        <div class="why-card">
+          <div class="why-num is-amber">01</div>
+          <h3>NOTHING TO INSTALL</h3>
+          <p>It's a web page. Open it, play it, close the tab. No launcher, no 40GB patch, no restart.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-num is-red">02</div>
+          <h3>ZERO ADS, ZERO POPUPS</h3>
+          <p>No pre-roll video, no "watch to continue", no cookie maze. You came here to play a game.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-num is-teal">03</div>
+          <h3>RUNS ON ANYTHING</h3>
+          <p>Chromebook, ten-year-old laptop, phone on hotel wifi. If it has a browser, it has an arcade.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-num is-purple">04</div>
+          <h3>SAVES WITHOUT ACCOUNTS</h3>
+          <p>Your runs and settings stick to the device. Put a name on the board only if you beat a score worth keeping.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="leaderboard" class="wrap section">
+    <div class="board-section">
+      <div>
+        <span class="kicker is-teal">HALL OF FAME</span>
+        <h2 class="board-title">THIS WEEK'S<br />TOP BEAVERS</h2>
+        <p class="board-copy">
+          Boards reset every Monday at 00:00 UTC. Chicken Attack, wave survival — the score you post
+          at game over is the score that counts.
+        </p>
+        <a href={`/games/${featured.slug}/`} class="btn-ghost">Post a score</a>
+      </div>
+      <Leaderboard game={featured.slug} limit={8} period="week" />
+    </div>
+  </section>
+
+  <section class="pricing">
+    <div class="wrap pricing-inner">
+      <div>
+        <h2 class="pricing-title">
+          THE PRICE IS<br /><span class="accent-teal">NOTHING</span>
+        </h2>
+        <p class="pricing-copy">
+          No tiers, no coins, no energy timers. This is a hobby arcade: the games are free, the code
+          is open, and that's the whole business model.
+        </p>
+      </div>
+      <div class="price-card">
+        <div class="price-plan">EVERYONE PLAN</div>
+        <div class="price-row">
+          <span class="price-num">$0</span>
+          <span class="price-per">/ forever</span>
+        </div>
+        <div class="price-features">
+          <div class="price-feature"><span class="tick">▸</span>Every game, no locks</div>
+          <div class="price-feature"><span class="tick">▸</span>Leaderboards with weekly resets</div>
+          <div class="price-feature"><span class="tick">▸</span>Offline play and device saves</div>
+          <div class="price-feature"><span class="tick">▸</span>No ads on any page, ever</div>
+        </div>
+        <a href={`/games/${featured.slug}/`} class="price-cta">START PLAYING</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="signup" class="signup">
+    <div class="signup-inner">
+      <span class="kicker is-red">NEW CABINET WHEN IT'S READY</span>
+      <h2 class="signup-title">GET THE DROP FIRST</h2>
+      <p class="signup-copy">
+        Leave an email and hear about new cabinets when they land. Nothing else, ever.
+      </p>
+      <form class="signup-form" data-signup novalidate>
+        <label class="hp-field" aria-hidden="true">
+          Leave this empty
+          <input type="text" name="website" tabindex="-1" autocomplete="off" />
+        </label>
+        <input
+          class="signup-input"
+          type="email"
+          name="email"
+          placeholder="you@example.com"
+          required
+          aria-label="Email address"
+        />
+        <button type="submit" class="signup-btn">SIGN ME UP</button>
+      </form>
+      <p class="signup-note" data-signup-note></p>
+    </div>
+  </section>
+
+  <Footer variant="landing" />
+</Layout>
+
+<script>
+  /* Genre filter for the catalog. */
+  const filterHost = document.querySelector('[data-genre-filters]');
+  if (filterHost) {
+    const buttons = [...filterHost.querySelectorAll<HTMLButtonElement>('.genre-btn')];
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-game-grid] .game-card')];
+    filterHost.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.genre-btn');
+      if (!btn) return;
+      const genre = btn.dataset.genre || 'All';
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b === btn));
+      for (const card of cards) {
+        card.style.display = genre === 'All' || card.dataset.genre === genre ? '' : 'none';
+      }
+    });
+  }
+
+  /* Newsletter signup -> POST /api/signup. */
+  const form = document.querySelector<HTMLFormElement>('[data-signup]');
+  const note = document.querySelector<HTMLElement>('[data-signup-note]');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!note) return;
+    const data = new FormData(form);
+    const email = String(data.get('email') || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      note.textContent = 'That email does not look right.';
+      note.className = 'signup-note is-err';
+      return;
+    }
+    try {
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, website: String(data.get('website') || '') }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      note.textContent = 'You are on the list. See you on drop day.';
+      note.className = 'signup-note is-ok';
+      form.reset();
+    } catch {
+      note.textContent = 'Could not sign you up right now — try again later.';
+      note.className = 'signup-note is-err';
+    }
+  });
+</script>

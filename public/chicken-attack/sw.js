@@ -5,7 +5,7 @@
  * of files; icons and the manifest stay cache-first with background refresh.
  */
 
-const VERSION = 'chicken-attack-v6';
+const VERSION = 'chicken-attack-v7';
 
 /*
  * './' is the canonical app shell URL. Hosts that normalise /index.html to /

@@ -1,0 +1,234 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import Leaderboard from '../../components/Leaderboard.astro';
+import { GAMES, PLAYABLE } from '../../data/games.js';
+
+export function getStaticPaths() {
+  return PLAYABLE.map((game) => ({ params: { slug: game.slug }, props: { game } }));
+}
+
+const { game } = Astro.props;
+const related = GAMES.filter((g) => g.slug !== game.slug);
+---
+
+<Layout title={`${game.title} — play free on Beaver Games`} description={game.blurb}>
+  <Header variant="game" />
+
+  <div class="wrap breadcrumb">
+    <a href="/">Arcade</a> / {game.genre} / <span class="breadcrumb-here">{game.title}</span>
+  </div>
+
+  <section class="wrap game-layout">
+    <div>
+      <div class="stage" data-stage data-play-path={game.playPath} data-title={game.title}>
+        <img class="stage-art" src={game.stageArt} alt={`${game.title} title screen`} />
+        <div class="stage-overlay" data-stage-overlay>
+          <div class="stage-overlay-inner">
+            <div class="stage-title">{game.title.toUpperCase()}</div>
+            <div class="stage-sub">{game.tagline.toUpperCase()}</div>
+            <button type="button" class="btn-pixel stage-start" data-start>▶ START GAME</button>
+            <div class="stage-status" data-stage-status>Loads in about a second. No install.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-tools">
+        <button type="button" class="tool-btn" data-fullscreen>⛶ Fullscreen</button>
+        <button type="button" class="tool-btn" data-sound aria-pressed="true">♪ Sound on</button>
+        <button type="button" class="tool-btn" data-fav aria-pressed="false">♥ Save to favourites</button>
+        <a class="tool-btn tool-btn-link" href={game.playPath}>Open full page ↗</a>
+      </div>
+
+      <div class="about-block">
+        <h2 class="h3-display">ABOUT THIS GAME</h2>
+        {game.about.map((para) => <p class="about-copy">{para}</p>)}
+      </div>
+
+      <div class="info-cards">
+        <div class="info-card">
+          <h3>CONTROLS</h3>
+          <div class="control-list">
+            {
+              game.controls.map((c) => (
+                <div class="control-row">
+                  <span class="control-key">{c.key}</span>
+                  <span class="control-desc">{c.desc}</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <div class="info-card">
+          <h3>HOW TO WIN</h3>
+          <div class="tips-list">
+            {
+              game.tips.map((tip, i) => (
+                <div class="tip-row">
+                  <span class="tip-num">{String(i + 1).padStart(2, '0')}</span>
+                  {tip}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="game-aside">
+      <div class="info-card">
+        <div class="fact-grid">
+          <div>
+            <div class="fact-label">Genre</div>
+            <div class="fact-num">{game.genre}</div>
+          </div>
+          <div>
+            <div class="fact-label">Size</div>
+            <div class="fact-num">{game.stats.size}</div>
+          </div>
+          <div>
+            <div class="fact-label">Run time</div>
+            <div class="fact-num">{game.stats.runTime}</div>
+          </div>
+          <div>
+            <div class="fact-label">Players</div>
+            <div class="fact-num">{game.stats.players}</div>
+          </div>
+        </div>
+        <div class="fact-meta">
+          <div><span>Developer</span><span class="fact-meta-val">{game.meta.developer}</span></div>
+          <div><span>Released</span><span class="fact-meta-val">{game.meta.released}</span></div>
+          <div><span>Genre</span><span class="fact-meta-val">{game.meta.genreLine}</span></div>
+        </div>
+        <div class="cap-tags">
+          {game.capabilities.map((cap) => <span class="cap-tag">{cap}</span>)}
+        </div>
+      </div>
+
+      <div class="board-titled">
+        <div class="board-titled-head">TOP SCORES THIS WEEK</div>
+        <Leaderboard game={game.slug} limit={5} period="week" compact />
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">FREE, LIKE THE REST</div>
+        <p class="callout-copy">
+          No account needed. Finish a run and the name you enter at game over goes on the board.
+        </p>
+        <a href="/#leaderboard" class="callout-cta">SEE THE HALL OF FAME</a>
+      </div>
+    </aside>
+  </section>
+
+  <section class="related">
+    <div class="wrap related-inner">
+      <h2 class="h3-display">IF YOU LIKED THIS</h2>
+      <div class="related-grid">
+        {
+          related.map((g) =>
+            g.playable ? (
+              <a href={`/games/${g.slug}/`} class="game-card" data-genre={g.genre}>
+                <div class="game-card-screen">
+                  <img src={g.art} alt={`${g.title} art`} loading="lazy" />
+                </div>
+                <div class="game-card-row">
+                  <span class="game-card-title">{g.title}</span>
+                </div>
+                <div class="game-card-genre">{g.genre}</div>
+              </a>
+            ) : (
+              <div class="game-card is-soon">
+                <div class="game-card-screen">
+                  <span class="game-card-screen-empty">?</span>
+                </div>
+                <div class="game-card-row">
+                  <span class="game-card-title">{g.title}</span>
+                </div>
+                <div class="game-card-genre">{g.genre} · soon</div>
+              </div>
+            )
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  <Footer variant="game" />
+</Layout>
+
+<script>
+  const stage = document.querySelector<HTMLElement>('[data-stage]');
+  const overlay = document.querySelector<HTMLElement>('[data-stage-overlay]');
+  const status = document.querySelector<HTMLElement>('[data-stage-status]');
+  const startBtn = document.querySelector<HTMLButtonElement>('[data-start]');
+  const soundBtn = document.querySelector<HTMLButtonElement>('[data-sound]');
+  const favBtn = document.querySelector<HTMLButtonElement>('[data-fav]');
+  const fsBtn = document.querySelector<HTMLButtonElement>('[data-fullscreen]');
+
+  let frame: HTMLIFrameElement | null = null;
+  let soundOn = true;
+
+  /* START: swap the poster for the game itself, in-place. */
+  startBtn?.addEventListener('click', () => {
+    if (!stage || frame) return;
+    if (status) status.textContent = 'Loading…';
+    frame = document.createElement('iframe');
+    frame.src = stage.dataset.playPath || '/';
+    frame.className = 'stage-frame';
+    frame.allow = 'fullscreen; gamepad; vibration';
+    frame.title = stage.dataset.title || 'Game';
+    frame.addEventListener('load', () => {
+      overlay?.remove();
+      pushSound();
+    });
+    stage.append(frame);
+    stage.classList.add('is-playing');
+  });
+
+  /* Sound toggle: forwarded into the game via postMessage. */
+  function pushSound() {
+    frame?.contentWindow?.postMessage({ type: 'arcade:set-sound', on: soundOn }, location.origin);
+  }
+  soundBtn?.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? '♪ Sound on' : '✕ Sound off';
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    pushSound();
+  });
+
+  /* Fullscreen the stage (works before or after starting). */
+  fsBtn?.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else stage?.requestFullscreen?.().catch(() => {});
+  });
+
+  /* Favourites: a heart in localStorage, nothing more. */
+  const FAV_KEY = 'beaver-games.favs';
+  const slug = (stage?.dataset.playPath || '').replaceAll('/', '');
+  const readFavs = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  };
+  const paintFav = () => {
+    const on = readFavs().includes(slug);
+    if (favBtn) {
+      favBtn.textContent = on ? '♥ Saved' : '♥ Save to favourites';
+      favBtn.setAttribute('aria-pressed', String(on));
+    }
+  };
+  favBtn?.addEventListener('click', () => {
+    const favs = readFavs();
+    const i = favs.indexOf(slug);
+    if (i >= 0) favs.splice(i, 1);
+    else favs.push(slug);
+    try {
+      localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+    } catch {}
+    paintFav();
+  });
+  paintFav();
+</script>

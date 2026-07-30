@@ -1,0 +1,69 @@
+---
+/*
+ * Live leaderboard, filled client-side from GET /api/scores. Rendered with an
+ * empty-state row so the page is complete even if the API is unreachable
+ * (static build, no data at build time).
+ */
+interface Props {
+  game: string;
+  limit?: number;
+  period?: 'week' | 'all';
+  compact?: boolean;
+}
+
+const { game, limit = 8, period = 'week', compact = false } = Astro.props;
+---
+
+<div
+  class="board"
+  data-board
+  data-game={game}
+  data-limit={String(limit)}
+  data-period={period}
+>
+  <div class="board-head">
+    <span>RANK</span><span>PLAYER</span><span>SCORE</span>
+  </div>
+  <div data-board-rows>
+    <div class="board-empty" data-board-empty>
+      {compact ? 'No scores yet — set the first one.' : 'No scores on the board yet. Play a round and put your name up first.'}
+    </div>
+  </div>
+</div>
+
+<script>
+  // Every board on the page fills itself; failures leave the empty state.
+  for (const board of document.querySelectorAll<HTMLElement>('[data-board]')) {
+    const rows = board.querySelector<HTMLElement>('[data-board-rows]');
+    if (!rows) continue;
+    const params = new URLSearchParams({
+      game: board.dataset.game || '',
+      limit: board.dataset.limit || '8',
+      period: board.dataset.period || 'week',
+    });
+    fetch(`/api/scores?${params}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { scores: { name: string; score: number }[] }) => {
+        if (!data.scores || data.scores.length === 0) return;
+        rows.textContent = '';
+        data.scores.forEach((row, i) => {
+          const div = document.createElement('div');
+          div.className = 'board-row' + (i === 0 ? ' is-first' : i < 3 ? ' is-top3' : '');
+          const rank = document.createElement('span');
+          rank.className = 'board-rank';
+          rank.textContent = String(i + 1).padStart(2, '0');
+          const name = document.createElement('span');
+          name.className = 'board-name';
+          name.textContent = row.name;
+          const score = document.createElement('span');
+          score.className = 'board-score';
+          score.textContent = row.score.toLocaleString('en-US');
+          div.append(rank, name, score);
+          rows.append(div);
+        });
+      })
+      .catch(() => {
+        /* API missing or offline: keep the empty state */
+      });
+  }
+</script>

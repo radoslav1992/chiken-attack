@@ -1,25 +1,43 @@
 {
-  // Cloudflare Workers with static assets: everything in public/ is served
-  // as-is. There is no build step and no Worker script, so this is an
-  // "assets-only" Worker.
+  // Beaver Games: an Astro-built static site plus a small API Worker.
   //
-  //   npm install          # once, for wrangler
-  //   npm run dev          # local preview with _headers applied
-  //   npm run deploy       # deploy to Cloudflare
+  //   npm install                     # once
+  //   npm run db:migrate:local        # once: create tables for local dev
+  //   npm run dev                     # build + wrangler dev (site + API + local D1)
+  //   npm run db:migrate:remote       # once per new migration, before deploy
+  //   npm run deploy                  # astro build + wrangler deploy
   //
-  // Cloudflare Pages works too, see README.md.
+  // The games live in public/ and are copied through the Astro build verbatim,
+  // so each stays a self-contained PWA under its own path.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chicken-attack",
+  "main": "worker/index.js",
   "compatibility_date": "2026-07-01",
+  // Wrangler runs this before every deploy/dev, so a bare `wrangler deploy`
+  // works anywhere — including Cloudflare's git integration, which otherwise
+  // deploys without building and fails on the missing dist/ directory.
+  "build": {
+    "command": "npm run build",
+    "watch_dir": "src"
+  },
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
+    "binding": "ASSETS",
     // Serve /index.html for "/" and strip .html from URLs.
     "html_handling": "auto-trailing-slash",
-    // The game has no client-side routing, and index.html links its assets
-    // relatively, so an SPA fallback would answer /any/deep/path with a shell
-    // whose relative asset URLs 404. Serve the branded 404 page instead.
-    "not_found_handling": "404-page"
+    // Unknown paths get the branded 404 page (games link assets relatively,
+    // so an SPA fallback would break — see README).
+    "not_found_handling": "404-page",
+    // Only API routes invoke the Worker; everything else is pure static.
+    "run_worker_first": ["/api/*"]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "beaver-games",
+      "database_id": "69f8a829-5892-4552-8367-d606e6a46695"
+    }
+  ],
   "observability": {
     "enabled": true
   }

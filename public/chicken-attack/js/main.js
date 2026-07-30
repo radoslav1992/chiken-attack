@@ -268,10 +268,47 @@ game.on('pause', (paused) => {
   }
 });
 
+/* ---------------------------------------------------------- global scores -- */
+
+/*
+ * Fire-and-forget submission to the arcade's leaderboard API. The run id is
+ * client-generated so saving a name after game over renames the same run.
+ * Offline or API-less installs just skip it — the local table still works.
+ */
+let lastRun = null;
+
+function submitGlobalScore(result) {
+  if (result.score <= 0) return;
+  const id =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  lastRun = {
+    id,
+    game: 'chicken-attack',
+    score: Math.floor(result.score),
+    wave: result.wave,
+    difficulty: result.difficulty ? result.difficulty.id : 'veteran',
+  };
+  pushGlobalScore();
+}
+
+function pushGlobalScore() {
+  if (!lastRun) return;
+  fetch('/api/scores', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...lastRun, name: lastName() }),
+  }).catch(() => {
+    /* offline or standalone install — local scores only */
+  });
+}
+
 /* -------------------------------------------------------------- game over -- */
 
 game.on('gameover', (result) => {
   showHud(false);
+  submitGlobalScore(result);
   $('#go-score').textContent = formatScore(result.score);
   $('#go-wave').textContent = result.wave;
   $('#go-kills').textContent = result.stats.kills;
@@ -333,6 +370,7 @@ function saveName() {
   if (!nameLastScore(input.value)) return;
   nameSaved = true;
   input.blur();
+  pushGlobalScore();
   $('#btn-save-name').textContent = 'Saved';
   sfx.pickup();
   setTimeout(() => {
@@ -358,6 +396,23 @@ game.on('hud', (s) => {
 
 // Fade the "drag to fly" hint once the player actually flies.
 canvas.addEventListener('pointerdown', dismissHint, { passive: true });
+
+/* ------------------------------------------------------------ arcade bridge -- */
+
+/*
+ * When the game runs inside a game-page iframe, the page's sound button sends
+ * this message. It flips both sound and music together.
+ */
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin) return;
+  const msg = e.data;
+  if (!msg || msg.type !== 'arcade:set-sound') return;
+  settings.set('sound', !!msg.on);
+  settings.set('music', !!msg.on);
+  syncSettingsUi();
+  syncMusicSetting(game.state !== 'attract' && game.state !== 'boot');
+  if (msg.on && game.player) music.start(game.wave && game.wave.isBoss ? 'boss' : 'space');
+});
 
 /* --------------------------------------------------------------- lifecycle -- */
 

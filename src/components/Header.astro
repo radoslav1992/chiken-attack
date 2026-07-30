@@ -1,0 +1,32 @@
+---
+interface Props {
+  /** Landing page shows the section nav; game pages show a back link. */
+  variant?: 'landing' | 'game';
+}
+
+const { variant = 'landing' } = Astro.props;
+const home = variant === 'landing' ? '#top' : '/';
+---
+
+<header class="site-header">
+  <div class="wrap site-header-inner">
+    <a href={home} class="brand">
+      <span class="brand-mark">B</span>
+      <span class="brand-name">BEAVER GAMES</span>
+    </a>
+    {
+      variant === 'landing' ? (
+        <nav class="site-nav">
+          <a href="#catalog" class="nav-link">Games</a>
+          <a href="#leaderboard" class="nav-link">Leaderboard</a>
+          <a href="#why" class="nav-link">Why us</a>
+          <a href="/games/chicken-attack/" class="btn-pixel btn-red">PLAY NOW</a>
+        </nav>
+      ) : (
+        <nav class="site-nav">
+          <a href="/" class="nav-link">← Back to the arcade</a>
+        </nav>
+      )
+    }
+  </div>
+</header>
