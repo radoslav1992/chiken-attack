@@ -236,9 +236,36 @@ A table where the point is the promotion rather than the score. Roll over MISSIO
 four — clear the drop-target bank, sweep the beacons, run the orbit, work the spinner — and each one
 finished moves you a rank, Cadet to Admiral. The rank reached is what goes in the leaderboard's
 `wave` column, alongside Chicken Attack's waves and Beaver Dash's metres. Three balls, an extra ball
-at Lieutenant, multiball at Commander, and a tilt that kills the flippers on the fourth shove.
+at Lieutenant, multiball at Commander, and a tilt that kills the flippers on the fourth shove. The
+three lanes across the top of the dome light FUEL; light all three and the bonus multiplier steps up,
+which is what a hard plunge buys you, since every launch runs the top channel and a fast one crosses
+all three.
 
-### Two things worth knowing before changing it
+### The one rule the table is built around
+
+**The only way to lose a ball is through the gate between the flipper tips.** The first cut had wide
+open outlanes either side. Measured with no player input at all, 57% of launches drained down the
+right and only 43% ever came within a flipper's reach; the median ball lived 2.3 seconds. That is not
+difficulty, it is the table refusing to deal you in.
+
+The bottom third is now a pair of funnels whose final approach runs *flush into each flipper pivot* —
+nothing fits between a pivot and the wall beside it, so a ball down either side is delivered onto the
+flipper rather than past it. The plunger lane is a closed shaft to its own floor, and its top curves
+left like a real launch ramp, so a weak plunge is a re-plunge instead of a ball stranded in a corner.
+
+Getting there took two wrong turns worth recording. Killing the outlanes by bolting ledges across
+them left the ball circulating in the upper playfield for forty-five seconds without ever coming
+down — the fix for "the ball is lost too easily" must not become "the ball is never lost". And
+closing the gap beside each pivot opened a notch between the funnel wall and the pivot that was
+exactly ball-sized; every one of 240 launches ended parked in it at a speed of 3.
+
+None of that was found by playing. It was found by `oc-space.mjs`, which rasterises every position
+the ball's centre may legally occupy, floods it from the upper playfield, and asserts that the only
+reachable exit along the table's bottom edge is the central gate. A soak tells you how often balls
+*happen* to find a leak; the flood fill finds every leak there is, in a second, and it is what any
+change to the lower third should be re-run against.
+
+### Two more things worth knowing before changing it
 
 **`physics.js` and `table.js` are pure modules — no `window`, no `document`.** That is deliberate:
 the physics can be tested in Node directly, with no browser, which is what made it practical to run
@@ -264,5 +291,20 @@ table is a shelf the ball can rest on forever, so there are none.
 
 Both rules are checked mechanically rather than by eye — a stochastic wedge test that flies the ball
 from random positions at random speeds with the flippers flapping, and a deterministic pairwise scan
-of every surface. And every scoring feature is proven reachable from a flipper, because a table with
-a shot nobody can make is a dead table.
+of every surface. The wedge test spawns only in flood-filled reachable space: the table has sealed
+voids by design (inside each closed kicker triangle, the apron beside the plunger lane), and dropping
+a ball into one and calling it a wedge is a false alarm that costs an afternoon.
+
+Every scoring feature is proven reachable from a flipper, because a table with a shot nobody can make
+is a dead table — and the sweep varies *when* the flipper fires as well as where the ball sits, since
+timing is how a pinball player aims. Fixing the fire frame tests one shot fifteen times instead of
+fifteen shots, and it hid a broken orbit lane: with the mouth two hundred units too high, 0 of 84
+shots could reach it, which quietly killed one of the four missions.
+
+### The artwork
+
+Two layers. Everything that never changes — felt, starfield, the wormhole rings, panels, lane
+channels, chevrons, decals, chrome rails — is baked once into an offscreen canvas at the current
+pixel density and blitted with a single `drawImage`; only what animates is drawn per frame. That is
+what pays for artwork this dense: measured at 412x900 on a 2x display, the bake is 0.8 ms once per
+resize and the p95 frame draw is 0.4 ms against a 16.7 ms budget.

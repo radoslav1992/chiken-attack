@@ -5,7 +5,7 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'orbit-cadet-v1';
+const VERSION = 'orbit-cadet-v2';
 const SHELL = './';
 
 const ASSETS = [
