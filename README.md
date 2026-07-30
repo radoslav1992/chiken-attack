@@ -1,12 +1,14 @@
-# Chicken Attack
+# The Coop Arcade
 
-A mobile-first, installable PWA arcade shooter in the spirit of *Chicken Invaders*: waves of
-invading space poultry, drumsticks to hoover up, nine upgradeable weapons and a boss every fifth
-wave. One landing page, one **Start Game** button, no build step, fully playable offline — and a run
-interrupted by a closed tab is offered back to you the next time you open it.
+A hub of mobile-first browser games, served as one static site. The landing page at `/` lists the
+cabinets; each game lives in its own directory as a fully self-contained, installable PWA with its
+own service worker, manifest and icons.
 
-Everything — sprites, sound effects, music and icons — is generated procedurally at runtime
-(Canvas2D + Web Audio), so the whole game is a handful of text files and five small PNGs.
+The first cabinet is **Chicken Attack** (`/chicken-attack/`), an arcade shooter in the spirit of
+*Chicken Invaders*: waves of invading space poultry, drumsticks to hoover up, nine upgradeable
+weapons, timed power-ups and alternating bosses. No build step, fully playable offline, and a run
+interrupted by a closed tab is offered back to you the next time you open it. Everything — sprites,
+sound effects, music and icons — is generated procedurally at runtime (Canvas2D + Web Audio).
 
 ## Play it
 
@@ -14,8 +16,20 @@ Any static host works — the deployable site is the `public/` directory.
 
 ```bash
 npm run serve        # python3 -m http.server 8000 --directory public
-# then open http://localhost:8000
+# then open http://localhost:8000        (hub)
+#      or  http://localhost:8000/chicken-attack/
 ```
+
+## Adding a game
+
+1. Drop a self-contained game into `public/<name>/` — its own `index.html`, `sw.js`, manifest and
+   assets, all referenced with **relative** paths so the game works from any directory. Register
+   the service worker with a relative URL (`navigator.serviceWorker.register('sw.js')`) so its
+   scope is the game's directory, not the site root.
+2. Give its cache names a unique prefix (e.g. `<name>-v1`) and only ever delete caches with that
+   prefix — cache storage is shared across the whole origin.
+3. Copy a cabinet card in `public/index.html` and point it at `<name>/`.
+4. Add `no-cache`/`must-revalidate` rules for the new paths in `public/_headers`.
 
 ## Deploy to Cloudflare
 
@@ -58,15 +72,19 @@ job logs a notice and passes, so forks never see red builds.
   `unsafe-inline`) and the cache policy. Filenames are not content-hashed, so
   HTML, JS and CSS are served `must-revalidate` and only icons get a long TTL —
   otherwise a redeploy would leave players on a half-updated set of modules.
-  Offline play comes from the service worker, not from browser cache lifetimes.
+  Offline play comes from the service workers, not from browser cache lifetimes.
 - `not_found_handling: "404-page"` serves `public/404.html`. An SPA fallback
-  would be wrong here: the game has no client-side routing and `index.html`
-  links its assets relatively, so a shell served at `/some/deep/path` would
-  fetch `/some/deep/css/styles.css` and break.
-- Offline, the service worker answers navigations from cache; a deep link whose
-  origin is unreachable is redirected to the app root so relative URLs resolve.
+  would be wrong here: the games have no client-side routing and link their
+  assets relatively, so a shell served at `/some/deep/path` would fetch
+  `/some/deep/css/styles.css` and break.
+- Two service workers, two scopes: the hub's (`/sw.js`, scope `/`) keeps the
+  landing page available offline and bounces unreachable deep links to `/`;
+  each game's (e.g. `/chicken-attack/sw.js`, scope `/chicken-attack/`) owns its
+  game and wins for pages under its directory. The hub worker also migrates
+  pre-arcade installs: the game once lived at the root with this worker URL, so
+  old clients update to it and it deletes their legacy caches.
 
-After changing any file under `public/`, bump `VERSION` in `public/sw.js` so
+After changing a game's files, bump `VERSION` in that game's `sw.js` so
 installed clients pick the new bundle up on their next visit.
 
 ## Controls
@@ -157,29 +175,34 @@ Twelve named bosses in total, scaling with the wave.
 
 ```
 public/                    the deployable site — nothing else is uploaded
-  index.html               landing page + overlays (menu, how-to, scores, settings, pause, results)
-  404.html                 branded not-found page
+  index.html               arcade hub: one cabinet card per game
+  404.html                 site-level not-found page
   _headers                 Cloudflare security + cache headers
-  manifest.webmanifest     PWA manifest
-  sw.js                    offline cache
-  css/styles.css           mobile-first shell
-  icons/                   generated PNG icon set
-  js/main.js               boot, screen routing, settings, install prompt
-  js/game.js               loop, state machine, spawning, collisions, rendering
-  js/player.js             ship movement, weapons, pickups, death
-  js/enemies.js            chickens, asteroids, UFOs, bosses
-  js/waves.js              formations, wave archetypes, difficulty curve
-  js/weapons.js            weapon table + projectile rendering
-  js/powerups.js           timed power-up table and tuning constants
-  js/effects.js            pooled particles, shockwaves, floating text
-  js/hud.js                in-canvas HUD, boss bar, banners
-  js/art.js                procedural sprite pre-rendering + starfield
-  js/audio.js              Web Audio sound effects and music
-  js/input.js              touch / mouse / keyboard / gamepad
-  js/storage.js            settings + high scores
-  js/util.js               math, pooling, formatting
+  sw.js                    hub service worker (offline hub + legacy migration)
+  css/hub.css              hub + 404 styling
+  js/hub.js                hub service worker registration
+  chicken-attack/          the game — self-contained, relative paths only
+    index.html             landing + overlays (menu, how-to, scores, settings, pause, results)
+    manifest.webmanifest   PWA manifest (installable, scoped to this directory)
+    sw.js                  game service worker + offline cache
+    css/styles.css         mobile-first shell
+    icons/                 generated PNG icon set
+    js/main.js             boot, screen routing, settings, install prompt
+    js/game.js             loop, state machine, spawning, collisions, rendering
+    js/player.js           ship movement, weapons, pickups, death
+    js/enemies.js          chickens, asteroids, UFOs, bosses
+    js/waves.js            formations, wave archetypes, difficulty curve
+    js/weapons.js          weapon table + projectile rendering
+    js/powerups.js         timed power-up table and tuning constants
+    js/effects.js          pooled particles, shockwaves, floating text
+    js/hud.js              in-canvas HUD, boss bar, banners
+    js/art.js              procedural sprite pre-rendering + starfield
+    js/audio.js            Web Audio sound effects and music
+    js/input.js            touch / mouse / keyboard / gamepad
+    js/storage.js          settings + high scores
+    js/util.js             math, pooling, formatting
 wrangler.jsonc             Cloudflare deploy config
-tools/make-icons.mjs       regenerates public/icons (dependency-free PNG encoder)
+tools/make-icons.mjs       regenerates chicken-attack/icons (dependency-free PNG encoder)
 ```
 
 Regenerate the icon set after changing the artwork:

@@ -1,42 +1,28 @@
 /*
- * Service worker: precache the whole app shell (it is only a handful of text
- * files plus icons) so the game is fully playable offline. Navigations, scripts
- * and styles are network-first so an online page always runs one deploy's worth
- * of files; icons and the manifest stay cache-first with background refresh.
+ * The Coop Arcade — hub service worker, scope "/".
+ *
+ * Two jobs:
+ *  1. Keep the hub (and the site-level 404 behaviour) available offline.
+ *  2. Migrate pre-arcade installs. Before the site became an arcade the game
+ *     lived at the origin root and registered THIS URL with scope "/", so old
+ *     clients update to this worker automatically; its activate step deletes
+ *     their legacy caches. The game's own worker now lives at
+ *     /chicken-attack/sw.js with a matching scope, which wins for game pages.
+ *
+ * Cache storage is shared per origin, so this worker only ever touches caches
+ * with its own prefix (plus the explicitly listed legacy names) — never the
+ * games' caches.
  */
 
-const VERSION = 'chicken-attack-v5';
-
-/*
- * './' is the canonical app shell URL. Hosts that normalise /index.html to /
- * (Cloudflare's `html_handling`, for one) answer a request for 'index.html'
- * with a redirect, so it is never precached or matched by name.
- */
-const SHELL = './';
+const VERSION = 'coop-hub-v1';
+const LEGACY = /^chicken-attack-v[1-5]$/; // pre-arcade caches at this scope
 
 const ASSETS = [
-  SHELL,
-  'manifest.webmanifest',
-  'css/styles.css',
-  'js/main.js',
-  'js/game.js',
-  'js/player.js',
-  'js/enemies.js',
-  'js/waves.js',
-  'js/weapons.js',
-  'js/powerups.js',
-  'js/effects.js',
-  'js/hud.js',
-  'js/art.js',
-  'js/audio.js',
-  'js/input.js',
-  'js/storage.js',
-  'js/util.js',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
-  'icons/apple-touch-icon.png',
-  'icons/favicon-64.png',
+  './',
+  'css/hub.css',
+  '404.html',
+  // The hub shows this game's icon; cached here so the offline hub is whole.
+  'chicken-attack/icons/icon-192.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -52,7 +38,13 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => (k.startsWith('coop-hub-') && k !== VERSION) || LEGACY.test(k))
+            .map((k) => caches.delete(k))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -62,65 +54,61 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Game pages are controlled by the game's own worker; anything under a game
+  // directory that still reaches this worker just goes to the network.
+  if (url.pathname.startsWith('/chicken-attack/')) {
+    if (request.destination === 'image') {
+      // …except the icon the hub itself displays.
+      event.respondWith(caches.match(request).then((r) => r || fetch(request)));
+    }
+    return;
+  }
 
-  // Navigations: keep the shell fresh online, fall back to it offline.
+  // Navigations: network-first; offline, serve the hub shell (deep links
+  // bounce to "/" so the shell's relative URLs resolve).
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          if (res.ok && !res.redirected) {
+          if (res.ok && !res.redirected && url.pathname === '/') {
             const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(SHELL, copy));
+            caches.open(VERSION).then((c) => c.put('./', copy));
           }
           return res;
         })
         .catch(async () => {
-          const root = new URL(SHELL, self.registration.scope);
-          // A cached shell only works at the scope root — its stylesheet and
-          // module URLs are relative. Deep links bounce there instead.
-          if (url.pathname !== root.pathname) return Response.redirect(root.href, 302);
-          return (await caches.match(SHELL)) || Response.error();
+          if (url.pathname !== '/') return Response.redirect('/', 302);
+          return (await caches.match('./')) || Response.error();
         })
     );
     return;
   }
 
-  /*
-   * Scripts and styles are network-first. Cache-first served a page whose HTML
-   * (network-first) was newer than its JS/CSS (stale until the next visit), so
-   * the first load after a deploy ran old code against new markup — freshly
-   * added UI rendered but nothing wired it up. Online, everything now comes
-   * from one version; offline falls back to the atomic precache.
-   */
+  // Scripts and styles network-first (mixed-version lesson); rest cache-first.
   const critical = request.destination === 'script' || request.destination === 'style';
-  if (critical) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(request).then((r) => r || Response.error()))
-    );
-    return;
-  }
-
-  // Everything else (icons, manifest): cache-first with background refresh.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(request, copy));
-          }
-          return res;
+    (critical
+      ? fetch(request)
+          .then((res) => {
+            if (res && res.status === 200 && res.type === 'basic') {
+              const copy = res.clone();
+              caches.open(VERSION).then((c) => c.put(request, copy));
+            }
+            return res;
+          })
+          .catch(() => caches.match(request))
+      : caches.match(request).then((cached) => {
+          const network = fetch(request)
+            .then((res) => {
+              if (res && res.status === 200 && res.type === 'basic') {
+                const copy = res.clone();
+                caches.open(VERSION).then((c) => c.put(request, copy));
+              }
+              return res;
+            })
+            .catch(() => cached);
+          return cached || network;
         })
-        .catch(() => cached);
-      return cached || network;
-    })
+    ).then((r) => r || Response.error())
   );
 });
