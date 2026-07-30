@@ -10,7 +10,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons');
+const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'chicken-attack', 'icons');
 
 /* ----------------------------------------------------------------- helpers -- */
 

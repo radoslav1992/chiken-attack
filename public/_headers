@@ -1,9 +1,8 @@
-# Cloudflare response headers (honoured by both Workers static assets and Pages).
+# The Coop Arcade — response headers (Workers static assets / Pages).
 #
-# Cache policy note: none of the filenames are content-hashed, so the HTML,
-# scripts and styles must always be revalidated — otherwise a redeploy would
-# leave players on a stale mix of old and new modules. Offline play comes from
-# the service worker, not from browser cache lifetimes.
+# Cache policy: no filenames are content-hashed, so HTML, scripts and styles
+# always revalidate; only icons get a long TTL. Offline play comes from each
+# game's service worker, not from browser cache lifetimes.
 
 /*
   X-Content-Type-Options: nosniff
@@ -12,29 +11,42 @@
   Cross-Origin-Opener-Policy: same-origin
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'self'
 
-# The service worker must never be served from cache, or updates can never land.
+# Service workers must never be cached, or updates can never land. The root
+# one is the self-destruct stub for pre-arcade installs.
 /sw.js
   Cache-Control: no-cache, must-revalidate
-  Service-Worker-Allowed: /
 
-/index.html
+/chicken-attack/sw.js
   Cache-Control: no-cache, must-revalidate
 
+# Hub
 /
+  Cache-Control: no-cache, must-revalidate
+
+/index.html
   Cache-Control: no-cache, must-revalidate
 
 /404.html
   Cache-Control: no-cache, must-revalidate
 
-/manifest.webmanifest
-  Cache-Control: public, max-age=3600, must-revalidate
-
-/js/*
-  Cache-Control: public, max-age=0, must-revalidate
-
 /css/*
   Cache-Control: public, max-age=0, must-revalidate
 
-# Icons change only when the artwork does, and a stale icon is harmless.
-/icons/*
+# Chicken Attack
+/chicken-attack/
+  Cache-Control: no-cache, must-revalidate
+
+/chicken-attack/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/chicken-attack/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/chicken-attack/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/chicken-attack/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/chicken-attack/icons/*
   Cache-Control: public, max-age=604800
