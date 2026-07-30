@@ -1,0 +1,25 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Hand-picked browser games that load in under a second. No installs, no ads, playable offline.' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#12101c" />
+    <link rel="icon" href="/chicken-attack/icons/icon-192.png" sizes="192x192" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

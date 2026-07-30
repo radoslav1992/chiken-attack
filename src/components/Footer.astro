@@ -1,0 +1,57 @@
+---
+interface Props {
+  variant?: 'landing' | 'game';
+}
+
+const { variant = 'landing' } = Astro.props;
+const anchor = (hash: string) => (variant === 'landing' ? hash : `/${hash}`);
+---
+
+<footer class="site-footer">
+  {
+    variant === 'landing' ? (
+      <>
+        <div class="wrap footer-grid">
+          <div>
+            <div class="footer-brand">
+              <span class="footer-brand-mark">B</span>
+              <span class="footer-brand-name">BEAVER GAMES</span>
+            </div>
+            <p class="footer-tag">
+              Built for browsers, not launchers.
+            </p>
+          </div>
+          <div>
+            <div class="footer-col-title">PLAY</div>
+            <div class="footer-links">
+              <a href={anchor('#catalog')}>All games</a>
+              <a href="/games/chicken-attack/">Chicken Attack</a>
+              <a href={anchor('#leaderboard')}>Leaderboards</a>
+            </div>
+          </div>
+          <div>
+            <div class="footer-col-title">ARCADE</div>
+            <div class="footer-links">
+              <a href={anchor('#why')}>Why us</a>
+              <a href={anchor('#signup')}>Newsletter</a>
+              <a href="https://github.com/radoslav1992/chiken-attack">Source on GitHub</a>
+            </div>
+          </div>
+        </div>
+        <div class="wrap">
+          <div class="footer-legal">
+            <span>© 2026 BEAVER GAMES</span>
+            <span>INSERT COIN — JUST KIDDING, IT'S FREE</span>
+          </div>
+        </div>
+      </>
+    ) : (
+      <div class="wrap">
+        <div class="footer-legal">
+          <span>© 2026 BEAVER GAMES</span>
+          <a href="/">BACK TO THE ARCADE</a>
+        </div>
+      </div>
+    )
+  }
+</footer>

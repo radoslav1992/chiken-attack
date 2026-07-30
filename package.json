@@ -1,19 +1,23 @@
 {
-  "name": "chicken-attack",
+  "name": "beaver-games",
   "version": "1.0.0",
   "private": true,
-  "description": "Mobile-first PWA arcade shooter: waves of invading space chickens, nine weapons, boss hens.",
+  "description": "Beaver Games: an arcade of mobile-first browser games with leaderboards, on Cloudflare Workers.",
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "wrangler dev",
-    "serve": "python3 -m http.server 8000 --directory public",
-    "deploy": "wrangler deploy",
-    "deploy:pages": "wrangler pages deploy public --project-name chicken-attack",
+    "dev": "astro build && wrangler dev",
+    "dev:ui": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "tail": "wrangler tail",
     "icons": "node tools/make-icons.mjs"
   },
   "devDependencies": {
+    "astro": "^7.1.6",
     "wrangler": "^4.115.0"
   }
 }

@@ -1,93 +1,107 @@
-# The Coop Arcade
+# Beaver Games
 
-A hub of mobile-first browser games, served as one static site. The landing page at `/` lists the
-cabinets; each game lives in its own directory as a fully self-contained, installable PWA with its
-own service worker, manifest and icons.
+An arcade of mobile-first browser games with real leaderboards, built as an Astro site plus a
+small API Worker on Cloudflare. The landing page and per-game pages implement the "Beaver Games"
+design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
+with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-The first cabinet is **Chicken Attack** (`/chicken-attack/`), an arcade shooter in the spirit of
-*Chicken Invaders*: waves of invading space poultry, drumsticks to hoover up, nine upgradeable
-weapons, timed power-ups and alternating bosses. No build step, fully playable offline, and a run
-interrupted by a closed tab is offered back to you the next time you open it. Everything — sprites,
-sound effects, music and icons — is generated procedurally at runtime (Canvas2D + Web Audio).
+The first cabinet is **Chicken Attack** (`/chicken-attack/`, game page at
+`/games/chicken-attack/`): an arcade shooter in the spirit of *Chicken Invaders* — nine weapons,
+timed power-ups, alternating bosses, difficulty modes, autosaved runs, fully playable offline.
+Everything in it is generated procedurally at runtime (Canvas2D + Web Audio).
 
-## Play it
+## Stack
 
-Any static host works — the deployable site is the `public/` directory.
+- **Astro** (static output) for the landing page, game pages and 404 — built to `dist/`.
+- **Cloudflare Workers static assets** serve the build; `worker/index.js` handles `/api/*` only
+  (`run_worker_first` in `wrangler.jsonc`).
+- **Cloudflare D1** stores scores and newsletter signups (`migrations/`).
+- The games themselves are plain static files in `public/`, copied through the build verbatim.
+
+## Develop
 
 ```bash
-npm run serve        # python3 -m http.server 8000 --directory public
-# then open http://localhost:8000        (hub)
-#      or  http://localhost:8000/chicken-attack/
+npm install
+npm run db:migrate:local     # once: create tables in the local D1 (miniflare)
+npm run dev                  # astro build + wrangler dev → http://localhost:8787
 ```
+
+`npm run dev:ui` runs the Astro dev server alone (fast page iteration, no API/games).
+
+## Deploy
+
+One-time setup:
+
+```bash
+npx wrangler login
+npx wrangler d1 create beaver-games      # prints a database_id
+# paste that id into wrangler.jsonc → d1_databases[0].database_id
+npm run db:migrate:remote                # create tables in production
+npm run deploy                           # astro build + wrangler deploy
+```
+
+After that, `npm run deploy` is the whole release. CI (`.github/workflows/deploy-cloudflare.yml`)
+does the same on pushes to `main` once `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets
+exist — it also applies pending D1 migrations before deploying.
+
+## API
+
+| Route | Method | Purpose |
+| --- | --- | --- |
+| `/api/scores?game=<slug>&period=week\|all&limit=N` | GET | Top scores (week = since Monday 00:00 UTC) |
+| `/api/scores` | POST | Submit a run `{ id, game, name, score, wave, difficulty }` — upserts by client run id, so saving a name at game over renames the run instead of duplicating it; a rename can never change the score |
+| `/api/signup` | POST | Newsletter signup `{ email }` (honeypot field silently accepted) |
+
+If the D1 binding is missing, reads return empty lists and writes 503 — the site works without
+the board, and the games never depend on it (score submission is fire-and-forget).
 
 ## Adding a game
 
-1. Drop a self-contained game into `public/<name>/` — its own `index.html`, `sw.js`, manifest and
-   assets, all referenced with **relative** paths so the game works from any directory. Register
-   the service worker with a relative URL (`navigator.serviceWorker.register('sw.js')`) so its
-   scope is the game's directory, not the site root.
-2. Give its cache names a unique prefix (e.g. `<name>-v1`) and only ever delete caches with that
-   prefix — cache storage is shared across the whole origin.
-3. Copy a cabinet card in `public/index.html` and point it at `<name>/`.
-4. Add `no-cache`/`must-revalidate` rules for the new paths in `public/_headers`.
+1. Drop a self-contained build into `public/<slug>/` — own `index.html`, `sw.js`, manifest,
+   assets, **relative paths only**, service worker registered with a relative URL, cache names
+   under a unique prefix (cache storage is origin-wide).
+2. Add an entry in `src/data/games.js` with `playable: true` — the landing catalog and
+   `/games/<slug>/` page generate from it.
+3. Add the slug to `KNOWN_GAMES` in `worker/index.js` to open its leaderboard.
+4. Add `_headers` cache rules for the new paths, plus card/stage art in `public/media/`.
 
-## Deploy to Cloudflare
+## Layout
 
-The repo is configured for **Cloudflare Workers static assets** (`wrangler.jsonc`
-points at `public/`). There is no build step, so a deploy is just an upload.
-
-```bash
-npm install          # once, for wrangler
-npm run dev          # local preview at http://localhost:8787 with _headers applied
-npm run deploy       # wrangler deploy
+```
+src/                        Astro site (Beaver Games design)
+  pages/index.astro         landing: hero, ticker, spotlight, catalog, why, leaderboard, signup
+  pages/games/[slug].astro  game page: stage with in-place launcher, info, weekly top scores
+  pages/404.astro           branded 404
+  components/               Header, Footer, Leaderboard (client-side fill from /api/scores)
+  data/games.js             the catalog — one entry per cabinet
+  styles/global.css         design tokens + all styling (CSP forbids inline styles)
+worker/index.js             /api/scores + /api/signup on D1
+migrations/                 D1 schema
+public/
+  chicken-attack/           the game — self-contained PWA, unchanged by the site build
+  fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
+  media/                    cabinet/stage art (captured from real gameplay)
+  sw.js                     self-destruct stub migrating pre-Astro installs
+  _headers                  security headers + cache policy
+wrangler.jsonc              Workers config: assets + Worker + D1
+tools/make-icons.mjs        regenerates the game's icon set (npm run icons)
 ```
 
-The first `npm run deploy` prompts for a browser login and creates a
-`chicken-attack.<your-subdomain>.workers.dev` site; add a custom domain from the
-Worker's dashboard **Settings → Domains & Routes** when you want one. Rename the
-project by editing `name` in `wrangler.jsonc`.
+## Notes that save debugging time
 
-**Cloudflare Pages** works equally well if you prefer it:
+- **CSP**: the site ships `script-src 'self'; style-src 'self'` — no `unsafe-inline`. Astro is
+  configured (`inlineStylesheets: 'never'`, `assetsInlineLimit: 0`) so it never inlines styles or
+  scripts; if a new page's script silently does nothing, check it didn't get inlined.
+- **Game page launcher**: START swaps the poster for a same-origin iframe of the game. The
+  page's sound button posts `{ type: 'arcade:set-sound', on }` into the frame; the game listens
+  and flips its sound+music settings.
+- **Scores**: the game POSTs at game over with a generated run id and re-POSTs after the player
+  names the run; the Worker upserts by id and only the name can change.
+- **Games' `_headers`/service workers** were not touched by the Astro migration: `/_astro/*` and
+  `/fonts/*` are content-hashed/immutable, game files revalidate, both service workers stay
+  `no-cache`.
 
-```bash
-npm run deploy:pages           # wrangler pages deploy public
-```
-
-Or connect the repository in the Pages dashboard and use:
-
-| Setting | Value |
-| --- | --- |
-| Framework preset | None |
-| Build command | *(leave empty)* |
-| Build output directory | `public` |
-
-**CI deploys.** `.github/workflows/deploy-cloudflare.yml` deploys on every push
-to `main` once two repository secrets exist: `CLOUDFLARE_API_TOKEN` (use the
-*Edit Cloudflare Workers* template) and `CLOUDFLARE_ACCOUNT_ID`. Without them the
-job logs a notice and passes, so forks never see red builds.
-
-### What the Cloudflare config does
-
-- `public/_headers` sets the security headers (including a strict CSP with no
-  `unsafe-inline`) and the cache policy. Filenames are not content-hashed, so
-  HTML, JS and CSS are served `must-revalidate` and only icons get a long TTL —
-  otherwise a redeploy would leave players on a half-updated set of modules.
-  Offline play comes from the service workers, not from browser cache lifetimes.
-- `not_found_handling: "404-page"` serves `public/404.html`. An SPA fallback
-  would be wrong here: the games have no client-side routing and link their
-  assets relatively, so a shell served at `/some/deep/path` would fetch
-  `/some/deep/css/styles.css` and break.
-- Two service workers, two scopes: the hub's (`/sw.js`, scope `/`) keeps the
-  landing page available offline and bounces unreachable deep links to `/`;
-  each game's (e.g. `/chicken-attack/sw.js`, scope `/chicken-attack/`) owns its
-  game and wins for pages under its directory. The hub worker also migrates
-  pre-arcade installs: the game once lived at the root with this worker URL, so
-  old clients update to it and it deletes their legacy caches.
-
-After changing a game's files, bump `VERSION` in that game's `sw.js` so
-installed clients pick the new bundle up on their next visit.
-
-## Controls
+## Chicken Attack (the game)
 
 | Action | Touch | Keyboard | Gamepad |
 | --- | --- | --- | --- |
@@ -96,122 +110,7 @@ installed clients pick the new bundle up on their next visit.
 | Missile | missile button, or tap with a second finger | X / Z / Ctrl | B |
 | Pause | pause button | P / Esc | Start |
 
-## Features
-
-**Modes & progression**
-
-- Three difficulties — Rookie (five ships, gentle eggs), Veteran, Superstar (two ships, ×1.6 score)
-  — picked on the landing page and recorded with each high score.
-- Runs autosave at every wave boundary: reopen the game and **Continue** picks up the wave, score,
-  ships, weapon, power level, missiles and drumsticks. Works offline too.
-- Endless escalating waves with a per-wave curve (health, speed, egg rate, egg speed) on top of the
-  difficulty multipliers.
-- Drumstick economy: 100 drumsticks earn an extra life. Combo multiplier up to ×5, wave-clear
-  bonuses for accuracy and remaining lives, top-10 local table with name entry and lifetime stats.
-- Timed power-ups (see below) drop alongside the permanent upgrades. Buffs are deliberately not
-  part of the autosave — a resumed run restarts the wave without them.
-
-**Combat**
-
-- Nine weapons with distinct behaviour and 10 power levels each: Ion Blaster, Neutron Gun,
-  Boron Railgun (piercing), Vulcan Chaingun, Positron Stream, Utensil Poker (spread), Lightning
-  Fryer (chains between chickens), Plasma Rifle (splash) and Corn Shotgun.
-- Homing missiles with splash damage, limited stock, restocked by gifts.
-- Losing a ship costs two weapon levels — same sting as the original.
-
-**Enemies**
-
-- Four chicken breeds (regular, brown, armoured, chicks) with health bars on the tough ones.
-- Six flight behaviours: formation slots, orbiting carousels, sine-wave strafing runs, dive
-  bombers that loop back around, falling chicken storms and chicks that chase the ship.
-- Nine wave archetypes on rotation, including ASCII-art formations (heart, skull, arrow, egg,
-  star, wings, invader), asteroid belts with rocks that shatter into shards, and bonus UFOs that
-  always drop a gift.
-- Every seventh non-boss wave is a **feast**: drumsticks and gifts rain down, nothing shoots back.
-- Gifts: weapon swap, +power, missiles, shield and extra life.
-
-**Power-ups**
-
-Timed boosts drop as labelled gift boxes and show a countdown ring in the HUD (glyph, plus the
-seconds remaining once under ten). Collecting one you already have refreshes its timer.
-
-| Power-up | Effect | Duration |
-| --- | --- | --- |
-| Wing Drones | Two escort drones fire your current weapon, a little slower and one power level down | 22 s |
-| Overdrive | Weapon cooldown cut to 55% — measured at ~1.7x the shot rate | 12 s |
-| Drumstick Magnet | Food and gifts home in from across the screen | 16 s |
-| Golden Egg | Doubles every point scored, on top of the combo and difficulty multipliers | 20 s |
-| Time Warp | Chickens, eggs and formations run at 45% speed; your ship and bullets do not | 9 s |
-| Pressure Cooker | Instant: scrambles every egg in flight and damages everything on screen (bosses take 55%) | — |
-
-**Bosses**
-
-Two archetypes alternate every fifth wave, both with three escalating phases and a health bar:
-
-- **The giant hen** — crowned, with egg volleys, radial egg rings, sweeping bombing runs, charges
-  that bounce off the walls, ground stomps and chick summons.
-- **The chicken mothership** — a saucer with a pilot hen in the dome that fires a telegraphed
-  cutting beam (dashed guide first, then a sweeping column), opens launch bays to disgorge escorts,
-  lobs spiralling plasma yolks, drops walls of eggs with a single gap and scatters slow mines.
-
-Twelve named bosses in total, scaling with the wave.
-
-**Presentation & platform**
-
-- Procedural sprites re-rendered per device pixel ratio, parallax starfield with nebula clouds,
-  particles, feathers, shockwaves, screen shake, hit flashes and slow-motion death.
-- Synthesised sound effects plus a step-sequenced soundtrack that switches to a faster, meaner
-  variant during boss fights.
-- Portrait-first layout, safe-area aware; wide screens (landscape, tablet, desktop) letterbox to a
-  centred playfield with the HUD hugging its edge.
-- Haptics, pause on tab switch (with a 3-2-1 countdown on resume so nobody unpauses into an egg),
-  settings persisted to `localStorage`, PWA install prompt, offline service worker.
-- Respects `prefers-reduced-motion` — no screen shake, no slow-motion death, dimmed flashes — plus
-  a manual screen-shake toggle in settings.
-- Gradients for bullets, pickups and boss lights are cached in local space rather than rebuilt per
-  object per frame; that alone lifted the worst-case wave from ~20 fps to a steady 60.
-
-## Layout
-
-```
-public/                    the deployable site — nothing else is uploaded
-  index.html               arcade hub: one cabinet card per game
-  404.html                 site-level not-found page
-  _headers                 Cloudflare security + cache headers
-  sw.js                    hub service worker (offline hub + legacy migration)
-  css/hub.css              hub + 404 styling
-  js/hub.js                hub service worker registration
-  chicken-attack/          the game — self-contained, relative paths only
-    index.html             landing + overlays (menu, how-to, scores, settings, pause, results)
-    manifest.webmanifest   PWA manifest (installable, scoped to this directory)
-    sw.js                  game service worker + offline cache
-    css/styles.css         mobile-first shell
-    icons/                 generated PNG icon set
-    js/main.js             boot, screen routing, settings, install prompt
-    js/game.js             loop, state machine, spawning, collisions, rendering
-    js/player.js           ship movement, weapons, pickups, death
-    js/enemies.js          chickens, asteroids, UFOs, bosses
-    js/waves.js            formations, wave archetypes, difficulty curve
-    js/weapons.js          weapon table + projectile rendering
-    js/powerups.js         timed power-up table and tuning constants
-    js/effects.js          pooled particles, shockwaves, floating text
-    js/hud.js              in-canvas HUD, boss bar, banners
-    js/art.js              procedural sprite pre-rendering + starfield
-    js/audio.js            Web Audio sound effects and music
-    js/input.js            touch / mouse / keyboard / gamepad
-    js/storage.js          settings + high scores
-    js/util.js             math, pooling, formatting
-wrangler.jsonc             Cloudflare deploy config
-tools/make-icons.mjs       regenerates chicken-attack/icons (dependency-free PNG encoder)
-```
-
-Regenerate the icon set after changing the artwork:
-
-```bash
-npm run icons
-```
-
-## Notes
-
-Scores and settings are stored locally in the browser; there is no backend and nothing leaves the
-device. `window.__game` is exposed for debugging from the console.
+Difficulty modes (Rookie/Veteran/Superstar), autosaved runs with a Continue button, nine weapons
+with ten power levels, six timed power-ups, two boss archetypes with three phases each, feast
+waves, local top-10 plus the global weekly board, `prefers-reduced-motion` support, and a service
+worker that keeps it fully playable offline. `window.__game` is exposed for debugging.
