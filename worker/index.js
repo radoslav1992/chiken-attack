@@ -16,7 +16,7 @@
 
 // Slugs must match src/data/games.js; kept inline so the Worker has no
 // build-time dependency on the Astro source tree.
-const KNOWN_GAMES = new Set(['chicken-attack']);
+const KNOWN_GAMES = new Set(['chicken-attack', 'beaver-dash']);
 
 const MAX_SCORE = 100_000_000;
 const MAX_WAVE = 10_000;
@@ -129,13 +129,15 @@ export default {
     const url = new URL(request.url);
 
     try {
+      // `await` matters: returning the bare promise would let its rejection
+      // escape this try/catch and surface as a raw 500 instead of JSON.
       if (url.pathname === '/api/scores') {
-        if (request.method === 'GET') return getScores(env, url);
-        if (request.method === 'POST') return postScore(env, request);
+        if (request.method === 'GET') return await getScores(env, url);
+        if (request.method === 'POST') return await postScore(env, request);
         return error('method not allowed', 405);
       }
       if (url.pathname === '/api/signup' && request.method === 'POST') {
-        return postSignup(env, request);
+        return await postSignup(env, request);
       }
       if (url.pathname.startsWith('/api/')) return error('not found', 404);
     } catch (err) {
