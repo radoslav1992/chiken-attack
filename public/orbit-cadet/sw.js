@@ -1,11 +1,11 @@
 /*
- * Beaver Dash service worker, scope /beaver-dash/. Precaches the shell for
+ * Orbit Cadet service worker, scope /orbit-cadet/. Precaches the shell for
  * offline play; navigations, scripts and styles are network-first so an online
  * page always runs one deploy's worth of files. Only touches caches carrying
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'beaver-dash-v2';
+const VERSION = 'orbit-cadet-v1';
 const SHELL = './';
 
 const ASSETS = [
@@ -14,6 +14,8 @@ const ASSETS = [
   'css/styles.css',
   'js/main.js',
   'js/game.js',
+  'js/physics.js',
+  'js/table.js',
   'js/audio.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -33,7 +35,7 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((k) => k.startsWith('beaver-dash-') && k !== VERSION).map((k) => caches.delete(k))
+          keys.filter((k) => k.startsWith('orbit-cadet-') && k !== VERSION).map((k) => caches.delete(k))
         )
       )
       .then(() => self.clients.claim())

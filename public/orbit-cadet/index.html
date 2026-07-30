@@ -6,61 +6,65 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
     />
-    <title>Beaver Dash — one button, endless forest</title>
-    <meta name="description" content="An endless runner: one button, a very determined beaver, and a forest that does not want you to make it. Hop stumps, long-jump the river, double-jump the dam, and stay low when the heron swoops." />
-    <meta name="theme-color" content="#12101c" />
+    <title>Orbit Cadet — pinball, and a promotion</title>
+    <meta name="description" content="A pinball table with a rank to climb. Two thumbs, two flippers: work the missions, clear the target bank, shoot the orbit, and rise from Cadet to Admiral before you run out of balls." />
+    <meta name="theme-color" content="#0b0913" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Beaver Dash" />
+    <meta name="apple-mobile-web-app-title" content="Orbit Cadet" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
-    <canvas id="game" aria-label="Game screen" role="img"></canvas>
+    <canvas id="game" aria-label="Pinball table" role="img"></canvas>
 
     <div id="app">
       <!-- HUD -->
       <div id="hud" class="hud is-hidden">
-        <div class="hud-left">
-          <div id="hud-score" class="hud-score">0</div>
-          <div class="hud-sub">
-            <span id="hud-dist">0m</span>
-            <span id="hud-phase" class="hud-phase">Midnight</span>
+        <div class="hud-top">
+          <div class="hud-block">
+            <span class="hud-label">Score</span>
+            <b id="hud-score">0</b>
+          </div>
+          <div class="hud-block hud-right">
+            <span class="hud-label">Rank</span>
+            <b id="hud-rank">Cadet</b>
           </div>
         </div>
-
-        <div class="hud-right">
-          <div class="hud-chips">
-            <span id="hud-mult" class="chip chip-mult is-hidden">x2</span>
-            <span id="hud-shield" class="chip chip-shield is-hidden" title="Shield: absorbs one hit">◈</span>
-          </div>
-          <div class="hud-acorns">
-            <span class="hud-acorn-dot" aria-hidden="true"></span>
-            <span id="hud-acorns">0</span>
-          </div>
+        <div class="hud-row">
+          <span id="hud-balls" class="pill">Ball 1 of 3</span>
+          <span id="hud-mission" class="pill pill-teal is-hidden"></span>
+          <span id="hud-tilt" class="pill pill-red is-hidden">TILT WARNING</span>
         </div>
-
         <button id="btn-pause" class="btn-pause" type="button" aria-label="Pause">❙❙</button>
-        <p id="milestone" class="milestone" aria-live="polite"></p>
-        <p id="coach" class="coach"></p>
+      </div>
+
+      <!-- Touch zones. Invisible, but they are the controls on a phone. -->
+      <div id="touch" class="touch is-hidden">
+        <div class="touch-flip touch-l" data-flip="L"></div>
+        <div class="touch-flip touch-r" data-flip="R"></div>
+        <div class="touch-plunge" data-plunge>
+          <span>HOLD<br />TO LAUNCH</span>
+        </div>
+        <div class="touch-nudge touch-nudge-l" data-nudge="-1" aria-hidden="true"></div>
+        <div class="touch-nudge touch-nudge-r" data-nudge="1" aria-hidden="true"></div>
       </div>
 
       <!-- Menu -->
       <section id="screen-menu" class="panel-wrap" aria-label="Main menu">
         <div class="panel">
-          <p class="kicker">ONE BUTTON · ENDLESS FOREST</p>
-          <h1 class="title">BEAVER<br />DASH</h1>
+          <p class="kicker">PINBALL · SEVEN RANKS</p>
+          <h1 class="title">ORBIT<br />CADET</h1>
           <ul class="verbs">
-            <li><b>Tap</b> to hop · <b>hold</b> for a full jump</li>
-            <li><b>Tap again</b> mid-air to double jump the <b class="c-dam">dam</b></li>
-            <li><b>Once more</b> to tail-slam through stumps and rocks</li>
-            <li>When the <b class="c-heron">heron</b> swoops — <b>press nothing</b></li>
+            <li><b>Left half</b> of the screen is the left flipper, <b>right half</b> the right</li>
+            <li><b>Hold anywhere low</b> to charge the plunger, release to launch</li>
+            <li>Roll over <b class="c-teal">MISSION</b> to arm one — finish it to get <b>promoted</b></li>
+            <li><b>Nudge</b> the table with the bottom corners. Three shoves and it <b class="c-red">tilts</b></li>
           </ul>
-          <button id="btn-start" class="btn-big" type="button">▶ RUN</button>
-          <p class="rotate-tip">↻ Turn your phone sideways — you get twice the run to read ahead.</p>
+          <button id="btn-start" class="btn-big" type="button">▶ PLAY</button>
           <p id="menu-best" class="best"></p>
           <div class="menu-row">
             <button id="btn-sound" class="btn-small" type="button">♪ Sound on</button>
@@ -73,7 +77,7 @@
       <section id="screen-pause" class="panel-wrap is-hidden" aria-label="Paused">
         <div class="panel">
           <h2 class="title-sm">PAUSED</h2>
-          <p class="copy copy-dim">The forest waits. It is very patient.</p>
+          <p class="copy copy-dim">The ball will wait. It has nowhere else to be.</p>
           <button id="btn-resume" class="btn-big" type="button">▶ RESUME</button>
           <div class="menu-row menu-row-top">
             <button id="btn-sound-2" class="btn-small" type="button">♪ Sound on</button>
@@ -83,17 +87,16 @@
       </section>
 
       <!-- Game over -->
-      <section id="screen-over" class="panel-wrap is-hidden" aria-label="Run over">
+      <section id="screen-over" class="panel-wrap is-hidden" aria-label="Game over">
         <div class="panel">
-          <h2 id="over-title" class="title-sm">DAM IT!</h2>
-          <p id="over-cause" class="copy copy-dim"></p>
+          <h2 id="over-title" class="title-sm">GAME OVER</h2>
+          <p id="over-rank" class="copy copy-dim"></p>
           <div class="result-grid">
             <div><span>Score</span><b id="over-score">0</b></div>
-            <div><span>Distance</span><b id="over-dist">0m</b></div>
-            <div><span>Acorns</span><b id="over-acorns">0</b></div>
+            <div><span>Rank</span><b id="over-rankv">Cadet</b></div>
+            <div><span>Missions</span><b id="over-missions">0</b></div>
             <div><span>Best</span><b id="over-best">0</b></div>
           </div>
-          <p id="over-extra" class="extra"></p>
           <form id="name-form" class="name-form" autocomplete="off">
             <label class="name-label" for="name-input">Name on the board</label>
             <div class="name-row">
@@ -101,13 +104,13 @@
               <button id="btn-save-name" class="btn-small" type="submit">Save</button>
             </div>
           </form>
-          <button id="btn-again" class="btn-big" type="button">▶ RUN AGAIN</button>
+          <button id="btn-again" class="btn-big" type="button">▶ PLAY AGAIN</button>
           <a class="btn-small btn-link btn-center" href="../">← Back to the arcade</a>
         </div>
       </section>
     </div>
 
-    <noscript><p class="noscript-note">Beaver Dash needs JavaScript to run.</p></noscript>
+    <noscript><p class="noscript-note">Orbit Cadet needs JavaScript to run.</p></noscript>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>

@@ -1535,3 +1535,29 @@ a.game-card:hover {
   font-size: 15px;
   margin: 0 0 26px;
 }
+
+
+/* --- Brand mark ----------------------------------------------------------
+ * Two forms of the same brand: the logo image when public/media/ has one, and a
+ * CSS fallback otherwise. The fallback deliberately borrows the logo's palette —
+ * amber-to-orange lettering, cyan accent — so swapping one for the other does
+ * not change how the site reads.
+ */
+.brand-logo {
+  display: block;
+  width: auto;
+  max-width: min(62vw, 320px);
+  object-fit: contain;
+  /* Lifts the mark off the dark header the way the logo's own outline does. */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
+.brand-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-brand .brand-logo {
+  max-width: min(70vw, 340px);
+}

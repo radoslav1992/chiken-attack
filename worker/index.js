@@ -16,7 +16,7 @@
 
 // Slugs must match src/data/games.js; kept inline so the Worker has no
 // build-time dependency on the Astro source tree.
-const KNOWN_GAMES = new Set(['chicken-attack', 'beaver-dash']);
+const KNOWN_GAMES = new Set(['chicken-attack', 'beaver-dash', 'orbit-cadet']);
 
 const MAX_SCORE = 100_000_000;
 const MAX_WAVE = 10_000;
