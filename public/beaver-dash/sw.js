@@ -5,7 +5,7 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'beaver-dash-v1';
+const VERSION = 'beaver-dash-v2';
 const SHELL = './';
 
 const ASSETS = [

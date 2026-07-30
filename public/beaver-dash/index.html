@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
     />
     <title>Beaver Dash — one button, endless forest</title>
-    <meta name="description" content="An endless runner: one button, a very determined beaver, and a forest that does not want you to make it. Jump stumps, double-jump log piles, and stay low when the heron swoops." />
+    <meta name="description" content="An endless runner: one button, a very determined beaver, and a forest that does not want you to make it. Hop stumps, long-jump the river, double-jump the dam, and stay low when the heron swoops." />
     <meta name="theme-color" content="#12101c" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -26,13 +26,26 @@
       <div id="hud" class="hud is-hidden">
         <div class="hud-left">
           <div id="hud-score" class="hud-score">0</div>
-          <div id="hud-dist" class="hud-dist">0m</div>
+          <div class="hud-sub">
+            <span id="hud-dist">0m</span>
+            <span id="hud-phase" class="hud-phase">Midnight</span>
+          </div>
         </div>
+
         <div class="hud-right">
-          <span class="hud-acorn-dot" aria-hidden="true"></span>
-          <span id="hud-acorns">0</span>
+          <div class="hud-chips">
+            <span id="hud-mult" class="chip chip-mult is-hidden">x2</span>
+            <span id="hud-shield" class="chip chip-shield is-hidden" title="Shield: absorbs one hit">◈</span>
+          </div>
+          <div class="hud-acorns">
+            <span class="hud-acorn-dot" aria-hidden="true"></span>
+            <span id="hud-acorns">0</span>
+          </div>
         </div>
+
+        <button id="btn-pause" class="btn-pause" type="button" aria-label="Pause">❙❙</button>
         <p id="milestone" class="milestone" aria-live="polite"></p>
+        <p id="coach" class="coach"></p>
       </div>
 
       <!-- Menu -->
@@ -40,15 +53,30 @@
         <div class="panel">
           <p class="kicker">ONE BUTTON · ENDLESS FOREST</p>
           <h1 class="title">BEAVER<br />DASH</h1>
-          <p class="copy">
-            Tap to jump. Tap again mid-air for a double jump.
-            When the <b class="c-heron">heron</b> swoops — stay on the ground.
-          </p>
+          <ul class="verbs">
+            <li><b>Tap</b> to hop · <b>hold</b> for a full jump</li>
+            <li><b>Tap again</b> mid-air to double jump the <b class="c-dam">dam</b></li>
+            <li><b>Once more</b> to tail-slam through stumps and rocks</li>
+            <li>When the <b class="c-heron">heron</b> swoops — <b>press nothing</b></li>
+          </ul>
           <button id="btn-start" class="btn-big" type="button">▶ RUN</button>
           <p id="menu-best" class="best"></p>
           <div class="menu-row">
             <button id="btn-sound" class="btn-small" type="button">♪ Sound on</button>
             <a class="btn-small btn-link" href="../">← Arcade</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pause -->
+      <section id="screen-pause" class="panel-wrap is-hidden" aria-label="Paused">
+        <div class="panel">
+          <h2 class="title-sm">PAUSED</h2>
+          <p class="copy copy-dim">The forest waits. It is very patient.</p>
+          <button id="btn-resume" class="btn-big" type="button">▶ RESUME</button>
+          <div class="menu-row menu-row-top">
+            <button id="btn-sound-2" class="btn-small" type="button">♪ Sound on</button>
+            <button id="btn-quit" class="btn-small" type="button">Give up</button>
           </div>
         </div>
       </section>
@@ -64,6 +92,7 @@
             <div><span>Acorns</span><b id="over-acorns">0</b></div>
             <div><span>Best</span><b id="over-best">0</b></div>
           </div>
+          <p id="over-extra" class="extra"></p>
           <form id="name-form" class="name-form" autocomplete="off">
             <label class="name-label" for="name-input">Name on the board</label>
             <div class="name-row">

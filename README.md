@@ -10,9 +10,10 @@ Two cabinets are open:
 - **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
   the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
   modes, autosaved runs.
-- **Beaver Dash** (`/beaver-dash/`, page at `/games/beaver-dash/`) — a one-button endless runner:
-  jump the stumps, double-jump the log piles, and *stay grounded* when the heron swoops at jump
-  height. Speeds up every 500 m; distance is banked alongside the score.
+- **Beaver Dash** (`/beaver-dash/`, page at `/games/beaver-dash/`) — a one-button endless runner
+  where each obstacle asks a different question of that button: hop, full jump, long jump, double
+  jump, or *press nothing*. Six weather phases, an acorn combo multiplier, a tail-slam dive.
+  Distance is banked alongside the score.
 
 Both are fully playable offline and every pixel and sound in them is generated procedurally at
 runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
@@ -133,17 +134,43 @@ worker that keeps it fully playable offline. `window.__game` is exposed for debu
 
 | Action | Touch | Keyboard |
 | --- | --- | --- |
-| Jump | tap anywhere | Space / ↑ / W |
+| Hop | tap | tap Space / ↑ / W |
+| Full jump | hold the tap | hold the key |
 | Double jump | tap again mid-air | press again mid-air |
-| Float the jump | keep holding the tap | keep holding the key |
+| Tail-slam dive | a third press mid-air | a third press mid-air |
 | Pause | pause button | P / Esc |
 
-Four obstacle archetypes, and the one that makes the game: the **heron** flies at exactly jump
-height, so the correct response to it is to do nothing. Acorns (25 pts) and golden acorns (250)
-arc along the safe jump path, so the collectibles double as the level's readability. Speed steps
-up every 500 m and gaps tighten with it; the opening ~2.3 screens are deliberately empty so a
-run never dies before the player's hands are on it.
+One button, five verbs. Each obstacle is built to demand exactly one of them:
 
-Everything scales off one unit `u = clamp(height / 420, 0.7, 2)` — gravity, jump impulse, ground
-line, obstacle sizes — and distance is divided back out by `u`, so a phone and a desktop measure
-the same metre and the leaderboard compares like with like.
+| Obstacle | Asks for | Why |
+| --- | --- | --- |
+| Stump | a tap | 0.72–1.05 m, under the ~1.7 m a tap reaches |
+| Log raft | a held jump | wide, so a hop lands on it |
+| River gap | a *long* jump | needs distance, not height |
+| Dam | the double jump | 3.55–4.05 m, above a single jump's 3.23 m apex |
+| Heron | nothing at all | flies at 1.35 m, which even a tap clips |
+
+A third press in the air is a tail-slam that smashes stumps and rocks (+75) but spends the rest of
+your descent, so diving early leaves you grounded with nothing left for what follows. Acorns build
+a multiplier to ×5, clearing something by under 0.42 m pays a near-miss bonus, and a rare fern
+shield absorbs one hit.
+
+### Two things worth knowing before changing it
+
+**The simulation is in metres, not pixels.** `mx` is a world position along the run (the beaver's
+own `mx` is just `distance`) and `y` is height above ground, positive up; `this.px` converts to
+pixels at draw time only. That is what makes the run device-independent — `mps` is a constant of
+the design, so every device measures the same metre and the shared leaderboard is comparable. The
+view scale takes the *smaller* of what width and height can afford; deriving it from height alone
+means a tall narrow phone draws a huge world into a narrow viewport and the warning time on an
+approaching obstacle collapses to under half a second.
+
+**Obstacle spacing obeys a law, and `auditPatterns()` enforces it.** Two hazards are only fair at
+one of two distances apart: close enough that one jump covers both (up to ~0.72 of a jump span,
+since the feet stay above rock height from 0.07 s to 0.58 s of the 0.69 s flight), or far enough
+apart to land and jump again (from ~1.25 spans, since touchdown is at 1.0). Anything between is a
+dead zone where the player lands *on* the second hazard no matter how well they timed the first —
+which is what an unaudited random spawner produces by default, and it reads as the game cheating.
+Patterns are hand-authored, never rolled per-obstacle, and no pattern mixes a heron (be grounded)
+with a gap (be airborne). The rest between patterns is measured in **seconds of reaction time**,
+not metres: at 2.5× speed a fixed metre gap would read 2.5× tighter than it did at the start.
