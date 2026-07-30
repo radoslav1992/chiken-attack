@@ -363,6 +363,23 @@ body {
   letter-spacing: 0.06em;
 }
 
+/* Landscape genuinely shows more of the approaching forest, so say so — but
+   only on a narrow screen held upright, and only on the menu. */
+.rotate-tip {
+  display: none;
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--teal);
+  letter-spacing: 0.04em;
+}
+
+@media (orientation: portrait) and (max-width: 620px) {
+  .rotate-tip {
+    display: block;
+  }
+}
+
 .menu-row {
   display: flex;
   gap: 10px;
@@ -474,6 +491,31 @@ body {
 
 .name-input:focus {
   border-color: var(--amber);
+}
+
+/* Narrow screens: the HUD is read at arm's length on a small display, and the
+   pause button is a thumb target. */
+@media (max-width: 620px) {
+  .hud-score {
+    font-size: 30px;
+  }
+
+  .hud-acorns {
+    font-size: 20px;
+  }
+
+  .btn-pause {
+    width: 46px;
+    height: 46px;
+  }
+
+  .hud-right {
+    right: calc(var(--safe-right) + 64px);
+  }
+
+  .coach {
+    font-size: 14px;
+  }
 }
 
 /* Short landscape (phone held sideways): tighten the panel so it still fits

@@ -133,22 +133,93 @@ const SPEC = {
 
 const item = (kind, at, opts = null) => ({ kind, at, opts });
 
-/* Acorns tracing the parabola the player is meant to fly, from `a` to `b`
- * metres, peaking at `peak`. The collectibles double as the level's tutorial. */
-function arcOver(a, b, peak, n = 5) {
+/* --- Acorn placement ------------------------------------------------------
+ * Chains are laid on the path the beaver actually flies, by running the same
+ * integrator the physics uses. A hand-drawn symmetric curve cannot match it:
+ * gravity is asymmetric (the fall is ~1.5x heavier than the climb) and the apex
+ * has a hang plateau, so a sine arc puts acorns where the beaver never goes and
+ * no jump, however well timed, collects them all.
+ */
+
+/** Height of the beaver's chest above its feet — where a swept-up acorn sits. */
+const BODY_MID = 0.42;
+/** How far outside its hitbox the beaver can hoover an acorn. */
+const GRAB = 0.4;
+/** Chain height for a flat run: inside the grab box while grounded. */
+const RUN_Y = 0.85;
+
+const pathCache = new Map();
+
+/* Each call to arc()/runLine() tags its acorns with a chain id. The audit needs
+ * to know which acorns belong to one press of the button, and inferring that
+ * from spacing does not work: two arcs can end up closer to each other than
+ * their own samples are. */
+let chainSeq = 0;
+
+/** Integrates one jump, returning the flown path and where its apex lands. */
+function jumpPath(mps, double = false) {
+  const key = `${Math.round(mps * 20)}:${double}`;
+  const hit = pathCache.get(key);
+  if (hit) return hit;
+
+  const dt = 1 / 480;
+  const pts = [];
+  let y = 0;
+  let vy = JUMP_V;
+  let x = 0;
+  let spent = !double;
+  let apexI = 0;
+  let apexY = 0;
+  for (let i = 0; i < 5000; i++) {
+    pts.push({ x, y });
+    if (y > apexY) {
+      apexY = y;
+      apexI = pts.length - 1;
+    }
+    // The second jump goes in at the first apex, which is where a player who
+    // means to clear a dam presses again.
+    if (!spent && vy <= 0) {
+      vy = JUMP2_V;
+      spent = true;
+    }
+    let g = vy > 0 ? G_RISE : G_FALL;
+    if (Math.abs(vy) < HANG_VY) g *= HANG_MUL;
+    vy -= g * dt;
+    y += vy * dt;
+    x += mps * dt;
+    if (y <= 0 && i > 8) break;
+  }
+  const out = { pts, apexX: pts[apexI].x, apexY, endX: x };
+  if (pathCache.size > 64) pathCache.clear();
+  pathCache.set(key, out);
+  return out;
+}
+
+/* A chain along the real jump arc, positioned so its apex sits over `overM`.
+ * Taking off where the chain starts therefore collects every acorn in it. */
+function arc(c, overM, opts = {}) {
+  const n = opts.n || 6;
+  const path = jumpPath(c.mps, !!opts.double);
+  const takeoff = overM - path.apexX;
+  const last = path.pts.length - 1;
+  const chain = ++chainSeq;
   const out = [];
   for (let i = 0; i < n; i++) {
-    const t = n === 1 ? 0.5 : i / (n - 1);
-    out.push(item('acorn', lerp(a, b, t), { y: 0.9 + Math.sin(t * Math.PI) * (peak - 0.9) }));
+    const p = path.pts[Math.round((i / (n - 1)) * last)];
+    out.push(item('acorn', takeoff + p.x, { y: p.y + BODY_MID, chain, jump: opts.double ? 2 : 1 }));
   }
   return out;
 }
 
-const line = (a, b, n, y = 1.05) => {
+/** A flat chain to sweep up at a run, from `a` to `b` metres. */
+function runLine(a, b, n, y = RUN_Y) {
+  const chain = ++chainSeq;
   const out = [];
-  for (let i = 0; i < n; i++) out.push(item('acorn', lerp(a, b, n === 1 ? 0.5 : i / (n - 1)), { y }));
+  for (let i = 0; i < n; i++) {
+    out.push(item('acorn', lerp(a, b, n === 1 ? 0.5 : i / (n - 1)), { y, chain, jump: 0 }));
+  }
   return out;
-};
+}
 
 /* --- Patterns -------------------------------------------------------------
  * Authored, not rolled. The old spawner drew each obstacle independently,
@@ -164,33 +235,33 @@ const line = (a, b, n, y = 1.05) => {
  */
 const PATTERNS = [
   /* tier 0 — one verb at a time */
-  { id: 'hop', tier: 0, len: 1, build: (c) => [item('stump', 0, { h: rand(1, 0.72) }), ...arcOver(-0.6, 1.6, 2.3, 4)] },
-  { id: 'rock', tier: 0, len: 1.5, build: (c) => [item('rock', 0), ...arcOver(-0.7, 2.2, 2.2, 4)] },
-  { id: 'coast', tier: 0, len: 3, build: (c) => line(0, 3, 5, 1.05) },
-  { id: 'twoHop', tier: 0, len: 6, build: (c) => [item('stump', 0, { h: 0.8 }), item('stump', c.span * SEPARATE, { h: 0.8 })] },
-  { id: 'hopPair', tier: 0, len: 3, build: (c) => [item('stump', 0, { h: 0.78 }), item('stump', c.span * TOGETHER, { h: 0.78 }), ...arcOver(-0.7, c.span * TOGETHER + 1.5, 2.7, 6)] },
+  { id: 'hop', tier: 0, len: 1, build: (c) => [item('stump', 0, { h: rand(1, 0.72) }), ...arc(c, 0.4)] },
+  { id: 'rock', tier: 0, len: 1.5, build: (c) => [item('rock', 0), ...arc(c, 0.6)] },
+  { id: 'coast', tier: 0, len: 3, build: (c) => runLine(0, 3, 5) },
+  { id: 'twoHop', tier: 0, len: 6, build: (c) => [item('stump', 0, { h: 0.8 }), item('stump', c.span * SEPARATE, { h: 0.8 }), ...arc(c, 0.4), ...arc(c, c.span * SEPARATE + 0.4)] },
+  { id: 'hopPair', tier: 0, len: 3, build: (c) => { const at2 = c.span * TOGETHER; return [item('stump', 0, { h: 0.78 }), item('stump', at2, { h: 0.78 }), ...arc(c, at2 / 2 + 0.4, { n: 7 })]; } },
 
   /* tier 1 — the other verbs arrive */
-  { id: 'logs', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.42, 0.3); return [item('logs', 0, { w }), ...arcOver(-0.5, w + 0.9, 2.6, 5)]; } },
-  { id: 'heron', tier: 1, len: 2, build: (c) => [item('heron', 0), ...line(-1.4, 2.8, 4, 0.75)] },
-  { id: 'gap', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.4, 0.34); return [item('gap', 0, { w }), ...arcOver(-0.4, w + 0.8, 2.4, 5)]; } },
-  { id: 'rockPair', tier: 1, len: 6, build: (c) => [item('rock', 0), item('rock', c.span * SEPARATE)] },
-  { id: 'acornArc', tier: 1, len: 3, build: (c) => [item('stump', 0, { h: 0.9 }), ...arcOver(-0.8, 2.6, 3, 6)] },
+  { id: 'logs', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.42, 0.3); return [item('logs', 0, { w }), ...arc(c, w / 2)]; } },
+  { id: 'heron', tier: 1, len: 2, build: (c) => [item('heron', 0), ...runLine(-1.4, 2.8, 4, 0.7)] },
+  { id: 'gap', tier: 1, len: 3, build: (c) => { const w = c.span * rand(0.4, 0.34); return [item('gap', 0, { w }), ...arc(c, w / 2)]; } },
+  { id: 'rockPair', tier: 1, len: 6, build: (c) => [item('rock', 0), item('rock', c.span * SEPARATE), ...arc(c, 0.6)] },
+  { id: 'acornArc', tier: 1, len: 3, build: (c) => [item('stump', 0, { h: 0.9 }), ...arc(c, 0.4, { n: 9 })] },
 
   /* tier 2 — two verbs in sequence, with a landing strip between */
-  { id: 'dam', tier: 2, len: 2, build: (c) => [item('dam', 0, { h: rand(3.9, 3.55) }), ...arcOver(-1, 2.4, 4.6, 6)] },
-  { id: 'gapStump', tier: 2, len: 7, build: (c) => { const w = c.span * 0.36; return [item('gap', 0, { w }), item('stump', c.span * SEPARATE + w, { h: 0.85 }), ...arcOver(-0.4, w + 0.7, 2.3, 4)]; } },
-  { id: 'heronStump', tier: 2, len: 5, build: (c) => [item('heron', 0), item('stump', c.span * 0.95, { h: 0.85 })] },
-  { id: 'logsRock', tier: 2, len: 7, build: (c) => { const w = c.span * 0.32; return [item('logs', 0, { w }), item('rock', c.span * SEPARATE + w)]; } },
-  { id: 'tripleHop', tier: 2, len: 8, build: (c) => [item('stump', 0, { h: 0.75 }), item('stump', c.span * SEPARATE, { h: 0.75 }), item('stump', c.span * SEPARATE * 2, { h: 0.75 })] },
-  { id: 'wideLogs', tier: 2, len: 4, build: (c) => { const w = c.span * 0.46; return [item('logs', 0, { w }), ...arcOver(-0.6, w + 1, 2.8, 6)]; } },
+  { id: 'dam', tier: 2, len: 2, build: (c) => [item('dam', 0, { h: rand(3.9, 3.55) }), ...arc(c, 0.55, { double: true, n: 8 })] },
+  { id: 'gapStump', tier: 2, len: 7, build: (c) => { const w = c.span * 0.36; return [item('gap', 0, { w }), item('stump', c.span * SEPARATE + w, { h: 0.85 }), ...arc(c, w / 2)]; } },
+  { id: 'heronStump', tier: 2, len: 5, build: (c) => [item('heron', 0), item('stump', c.span * 0.95, { h: 0.85 }), ...runLine(-1.2, 2.4, 3, 0.7)] },
+  { id: 'logsRock', tier: 2, len: 7, build: (c) => { const w = c.span * 0.32; return [item('logs', 0, { w }), item('rock', c.span * SEPARATE + w), ...arc(c, w / 2)]; } },
+  { id: 'tripleHop', tier: 2, len: 8, build: (c) => [item('stump', 0, { h: 0.75 }), item('stump', c.span * SEPARATE, { h: 0.75 }), item('stump', c.span * SEPARATE * 2, { h: 0.75 }), ...arc(c, 0.4)] },
+  { id: 'wideLogs', tier: 2, len: 4, build: (c) => { const w = c.span * 0.46; return [item('logs', 0, { w }), ...arc(c, w / 2, { n: 8 })]; } },
 
   /* tier 3 — the demanding end */
-  { id: 'gapGap', tier: 3, len: 9, build: (c) => { const a = c.span * 0.38, b = c.span * 0.36, at2 = c.span * SEPARATE + a; return [item('gap', 0, { w: a }), item('gap', at2, { w: b }), ...arcOver(-0.4, a + 0.6, 2.4, 4), ...arcOver(at2 - 0.4, at2 + b + 0.6, 2.4, 4)]; } },
-  { id: 'gapDam', tier: 3, len: 10, build: (c) => { const w = c.span * 0.34, at2 = c.span * SEPARATE + w; return [item('gap', 0, { w }), item('dam', at2, { h: 3.7 }), ...arcOver(at2 - 1, at2 + 2.4, 4.7, 6)]; } },
-  { id: 'damLogs', tier: 3, len: 9, build: (c) => [item('dam', 0, { h: 3.6 }), item('logs', c.span * AFTER_DAM, { w: c.span * 0.3 })] },
-  { id: 'heronPair', tier: 3, len: 6, build: (c) => [item('heron', 0), item('heron', c.span * 0.85), ...line(-1.2, c.span * 1.4, 6, 0.75)] },
-  { id: 'logsHeron', tier: 3, len: 7, build: (c) => { const w = c.span * 0.3; return [item('logs', 0, { w }), item('heron', w + c.span * 1.15)]; } },
+  { id: 'gapGap', tier: 3, len: 9, build: (c) => { const a = c.span * 0.38, b = c.span * 0.36, at2 = c.span * SEPARATE + a; return [item('gap', 0, { w: a }), item('gap', at2, { w: b }), ...arc(c, a / 2), ...arc(c, at2 + b / 2)]; } },
+  { id: 'gapDam', tier: 3, len: 10, build: (c) => { const w = c.span * 0.34, at2 = c.span * SEPARATE + w; return [item('gap', 0, { w }), item('dam', at2, { h: 3.7 }), ...arc(c, at2 + 0.55, { double: true, n: 8 })]; } },
+  { id: 'damLogs', tier: 3, len: 9, build: (c) => [item('dam', 0, { h: 3.6 }), item('logs', c.span * AFTER_DAM, { w: c.span * 0.3 }), ...arc(c, 0.55, { double: true, n: 8 })] },
+  { id: 'heronPair', tier: 3, len: 6, build: (c) => [item('heron', 0), item('heron', c.span * 0.85), ...runLine(-1.2, c.span * 1.4, 6, 0.7)] },
+  { id: 'logsHeron', tier: 3, len: 7, build: (c) => { const w = c.span * 0.3; return [item('logs', 0, { w }), item('heron', w + c.span * 1.15), ...arc(c, w / 2)]; } },
 ];
 
 const FERN_CYCLE = 30; // metres before the undergrowth repeats
@@ -215,13 +286,65 @@ const TOGETHER = 0.4;
 const SEPARATE = 1.35;
 const AFTER_DAM = 2.0; // a dam needs a double jump, which flies ~1.55 span
 
+/* Counts how many of a pattern's acorns the grab box would actually sweep up. A
+ * chain the player cannot finish is worse than no chain: it reads as the game
+ * withholding something, which is what a hand-drawn arc did.
+ *
+ * A pattern can carry several independent chains — two arcs a jump-and-a-half
+ * apart are two separate jumps, not one — so acorns are clustered first and
+ * each cluster is judged by its own shape: flat enough to run through, arcing
+ * above one jump's reach (two presses), or a single held jump. */
+function chainReach(items, mps) {
+  const acorns = items
+    .filter((i) => i.kind === 'acorn')
+    .map((i) => ({ at: i.at, y: i.opts.y, chain: i.opts.chain, jump: i.opts.jump, got: false }))
+    .sort((a, b) => a.at - b.at);
+  if (!acorns.length) return { placed: 0, got: 0 };
+
+  const bw = 1.1;
+  const bh = 0.81;
+
+  // Group by the chain each acorn was authored into — one press of the button.
+  const byChain = new Map();
+  for (const a of acorns) {
+    if (!byChain.has(a.chain)) byChain.set(a.chain, []);
+    byChain.get(a.chain).push(a);
+  }
+  const clusters = [...byChain.values()];
+
+  for (const group of clusters) {
+    const flat = group[0].jump === 0;
+    const path = flat ? null : jumpPath(mps, group[0].jump === 2);
+    const takeoff = group[0].at;
+    const last = group[group.length - 1].at;
+    const endM = flat ? last + 2 : takeoff + path.endX + 1;
+    const step = mps / 240;
+
+    for (let m = takeoff - 3; m <= endM; m += step) {
+      let y = 0;
+      if (path && m >= takeoff) {
+        const t = (m - takeoff) / path.endX;
+        if (t <= 1) y = path.pts[Math.round(t * (path.pts.length - 1))].y;
+      }
+      for (const a of group) {
+        if (a.got) continue;
+        const near = Math.abs(a.at - m) <= bw * 0.3 + GRAB;
+        const within = a.y >= y + 0.02 - GRAB && a.y <= y + bh * 0.88 + GRAB;
+        if (near && within) a.got = true;
+      }
+    }
+  }
+  return { placed: acorns.length, got: acorns.filter((a) => a.got).length, chains: clusters.length };
+}
+
 /* Checks every pattern against the rules the table is meant to obey. Called by
  * the test harness across a sweep of speeds; cheap enough to keep shipped so
  * the law lives next to the thing it governs.
  *
  * @returns {string[]} one message per violation, empty when the table is sound.
  */
-export function auditPatterns(span) {
+export function auditPatterns(mps) {
+  const span = AIRTIME * mps;
   const bad = [];
   const JUMP_WINDOW = 0.72; // span covered with the feet above rock height
   const LAND_AGAIN = 1.25; // span after which a fresh jump is available
@@ -229,13 +352,13 @@ export function auditPatterns(span) {
   for (const p of PATTERNS) {
     // Sample repeatedly: several patterns randomise their widths.
     for (let trial = 0; trial < 60; trial++) {
-      const items = p.build({ span, tier: p.tier });
+      const items = p.build({ span, tier: p.tier, mps });
       const hazards = [];
       let hasHeron = false;
       let hasGap = false;
       for (const it of items) {
         if (it.kind === 'acorn') continue;
-        const spec = SPEC[it.kind]({ span, tier: p.tier });
+        const spec = SPEC[it.kind]({ span, tier: p.tier, mps });
         const w = it.opts?.w ?? spec.w;
         if (it.kind === 'heron') {
           hasHeron = true;
@@ -263,6 +386,12 @@ export function auditPatterns(span) {
             `${p.id}: ${prev.kind}→${cur.kind} at ${((cur.at - prev.at) / span).toFixed(2)} span lands the player on the second`
           );
         }
+      }
+
+      // Every chain must be finishable by the play its shape asks for.
+      const reach = chainReach(items, mps);
+      if (reach.placed && reach.got < reach.placed) {
+        bad.push(`${p.id}: only ${reach.got}/${reach.placed} acorns reachable across ${reach.chains} chain(s)`);
       }
     }
   }
@@ -310,14 +439,22 @@ export class Game {
     this.canvas.height = Math.round(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // The view scale takes the SMALLER of what width and height can afford.
-    // Deriving it from height alone (as this used to) meant a tall narrow
-    // phone drew a huge world into a narrow viewport, which collapsed the
-    // warning time on an approaching obstacle to under half a second.
-    this.u = clamp(Math.min(this.w / 760, this.h / 430), 0.68, 1.9);
+    /* The view scale takes the SMALLER of what width and height can afford.
+     * Deriving it from height alone (as this used to) meant a tall narrow phone
+     * drew a huge world into a narrow viewport, which collapsed the warning
+     * time on an approaching obstacle to under half a second.
+     *
+     * The floor is what governs phones, and it is a straight trade: a bigger
+     * world means fewer metres of visible approach. At 0.68 the beaver was 31
+     * px on a 390 px screen — correct by the maths and too small to enjoy. 0.86
+     * makes it 40 px and costs ~0.2 s of reading time, bought back by moving
+     * the beaver further left on narrow screens. Landscape sits above the floor
+     * either way, which is why the menu suggests it.
+     */
+    this.u = clamp(Math.min(this.w / 760, this.h / 430), 0.86, 1.9);
     this.px = METER * this.u; // pixels per metre
     this.groundY = Math.round(this.h - clamp(this.h * 0.2, 84 * this.u, 150 * this.u));
-    this.bx = Math.round(this.w * 0.26); // beaver's fixed screen x
+    this.bx = Math.round(this.w * (this.w < 620 ? 0.18 : 0.26)); // beaver's screen x
 
     this.buildStatics();
     this._skyKey = '';
@@ -673,9 +810,13 @@ export class Game {
         this.pickups.splice(i, 1);
         continue;
       }
-      const dx = p.mx - this.distance;
-      const dy = p.y - (b.y + b.h * 0.5);
-      if (dx * dx + dy * dy < 0.62 * 0.62) {
+      /* Box-and-margin, not a point radius from the centre. The radius test
+       * reached only 1.02 m while grounded — the whole body should collect, and
+       * a chain at chest height should be swept up at a run rather than sitting
+       * two centimetres out of reach. */
+      const near = Math.abs(p.mx - this.distance) <= b.w * 0.3 + GRAB;
+      const within = p.y >= b.y + 0.02 - GRAB && p.y <= b.y + b.h * 0.88 + GRAB;
+      if (near && within) {
         this.pickups.splice(i, 1);
         this.take(p);
       }
@@ -939,7 +1080,7 @@ export class Game {
   /* -------------------------------------------------------------- spawning -- */
 
   spawnPattern() {
-    const c = { span: this.span, tier: this.tier };
+    const c = { span: this.span, tier: this.tier, mps: this.mps };
     // Unlocked tiers only, weighted towards the newest one so the run keeps
     // introducing something, and never a pattern seen in the last three.
     const unlocked = PATTERNS.filter((p) => p.tier <= this.tier && !this.recent.includes(p.id));
@@ -955,7 +1096,11 @@ export class Game {
       const mx = base + it.at;
       const o = it.opts || {};
       if (it.kind === 'acorn') {
-        this.pickups.push({ kind: 'acorn', mx, y: o.y ?? 1.05, t: rand(TAU) });
+        // `chain`/`jump` carry the authoring intent — which acorns belong to one
+        // press, and what that press is — so auditPatterns() and the test
+        // harness can check a chain is finishable instead of guessing from
+        // spacing, which two adjacent arcs defeat.
+        this.pickups.push({ kind: 'acorn', mx, y: o.y ?? RUN_Y, t: rand(TAU), chain: o.chain, jump: o.jump });
         continue;
       }
       const spec = SPEC[it.kind](c);

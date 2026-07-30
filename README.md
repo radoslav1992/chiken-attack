@@ -155,6 +155,15 @@ your descent, so diving early leaves you grounded with nothing left for what fol
 a multiplier to ×5, clearing something by under 0.42 m pays a near-miss bonus, and a rare fern
 shield absorbs one hit.
 
+**Acorn chains are generated from the physics, not drawn by hand.** `jumpPath()` runs the same
+integrator the beaver uses and `arc()` samples it, so a chain lies exactly on the path a jump
+flies and taking off where the chain starts collects all of it. A hand-drawn symmetric curve
+cannot do this: gravity is asymmetric, so the descent is steeper and shorter than the climb and the
+apex has a hang plateau — a sine arc puts acorns where the beaver never goes, and no jump, however
+well timed, gets them all. Flat chains sit at 0.85 m to be swept up at a run. Collection is a box
+around the whole body plus a 0.4 m margin, not a radius from the centre; the radius reached only
+1.02 m while grounded, which left a chain at 1.05 m permanently two centimetres out of reach.
+
 ### Two things worth knowing before changing it
 
 **The simulation is in metres, not pixels.** `mx` is a world position along the run (the beaver's
@@ -164,6 +173,14 @@ the design, so every device measures the same metre and the shared leaderboard i
 view scale takes the *smaller* of what width and height can afford; deriving it from height alone
 means a tall narrow phone draws a huge world into a narrow viewport and the warning time on an
 approaching obstacle collapses to under half a second.
+
+The scale floor is a straight trade and worth understanding before touching it: **a bigger world
+means fewer metres of visible approach**, because the screen is a fixed number of pixels. On a
+390 px-wide phone, `u` 0.68 drew a 31 px beaver with 1.4 s of reading time at base speed; 0.86 draws
+40 px with 1.2 s. There is no free lunch here — the only other levers are the beaver's screen x
+(moved left on narrow screens) and `mps`, and `mps` cannot change per device without making scores
+incomparable. Landscape sits above the floor on its own and gets 2.3 s, which is why the menu
+suggests turning the phone.
 
 **Obstacle spacing obeys a law, and `auditPatterns()` enforces it.** Two hazards are only fair at
 one of two distances apart: close enough that one jump covers both (up to ~0.72 of a jump span,
