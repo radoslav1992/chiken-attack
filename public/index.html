@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Chicken Attack — Space Poultry Shooter</title>
+    <meta name="description" content="A mobile-first arcade shooter: blast waves of invading space chickens, collect drumsticks, upgrade nine weapons and roast the boss hens." />
+    <meta name="theme-color" content="#05060f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Chicken Attack" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <!-- The game canvas doubles as the animated menu background. -->
+    <canvas id="game" aria-label="Game screen" role="img"></canvas>
+
+    <div id="app">
+      <!-- ------------------------------------------------------- landing -- -->
+      <section id="screen-menu" class="screen is-active" aria-label="Main menu">
+        <div class="menu-inner">
+          <header class="title-block">
+            <p class="kicker">Defend the galaxy from</p>
+            <h1 class="title">
+              <span class="title-line-1">CHICKEN</span>
+              <span class="title-line-2">ATTACK</span>
+            </h1>
+            <p class="tagline">Nine weapons. Endless waves. Very angry poultry.</p>
+          </header>
+
+          <div class="menu-buttons">
+            <button id="btn-play" class="btn btn-primary" type="button">
+              <span class="btn-icon">▶</span> Start Game
+            </button>
+            <div class="btn-row">
+              <button id="btn-how" class="btn btn-ghost" type="button">How to Play</button>
+              <button id="btn-scores" class="btn btn-ghost" type="button">Scores</button>
+            </div>
+            <div class="btn-row">
+              <button id="btn-settings" class="btn btn-ghost" type="button">Settings</button>
+              <button id="btn-install" class="btn btn-ghost is-hidden" type="button">Install App</button>
+            </div>
+          </div>
+
+          <footer class="menu-footer">
+            <p id="best-line" class="best">Best: 0</p>
+            <p class="hint">Drag anywhere to fly · auto-fire is on · tap with a second finger for missiles</p>
+          </footer>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------- how to play -- -->
+      <section id="screen-how" class="screen" aria-label="How to play">
+        <div class="sheet">
+          <h2>How to Play</h2>
+          <div class="sheet-body">
+            <div class="row">
+              <span class="row-icon">👆</span>
+              <div>
+                <h3>Fly</h3>
+                <p>Drag anywhere on the screen — your ship follows your finger's movement. Keyboard: arrows or WASD.</p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">🔥</span>
+              <div>
+                <h3>Shoot</h3>
+                <p>Auto-fire is on by default. Turn it off in settings to fire only while touching (or holding Space).</p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">🚀</span>
+              <div>
+                <h3>Missiles</h3>
+                <p>Tap the missile button — or tap with a second finger — to launch a homing missile. Keyboard: X.</p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">🍗</span>
+              <div>
+                <h3>Drumsticks</h3>
+                <p>Every roasted chicken may drop food. Collect 100 drumsticks for an extra life.</p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">🎁</span>
+              <div>
+                <h3>Gifts</h3>
+                <p>
+                  <b class="c-weapon">Weapon</b> swaps your gun,
+                  <b class="c-power">+</b> adds power,
+                  <b class="c-missile">Missiles</b> restocks,
+                  <b class="c-shield">Shield</b> absorbs one hit,
+                  <b class="c-life">Life</b> is a spare ship.
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">🥚</span>
+              <div>
+                <h3>Watch out</h3>
+                <p>Eggs, chickens, asteroids and boss attacks all hurt. Losing a ship also costs two weapon levels.</p>
+              </div>
+            </div>
+            <div class="row">
+              <span class="row-icon">👑</span>
+              <div>
+                <h3>Bosses</h3>
+                <p>Every fifth wave a boss hen arrives with three escalating phases. Break its health bar to feast.</p>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary sheet-close" type="button" data-close>Got it</button>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------- scores -- -->
+      <section id="screen-scores" class="screen" aria-label="High scores">
+        <div class="sheet">
+          <h2>High Scores</h2>
+          <ol id="score-list" class="score-list"></ol>
+          <p id="score-empty" class="empty">No runs yet. Go make some omelettes.</p>
+          <button class="btn btn-primary sheet-close" type="button" data-close>Back</button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------ settings -- -->
+      <section id="screen-settings" class="screen" aria-label="Settings">
+        <div class="sheet">
+          <h2>Settings</h2>
+          <div class="sheet-body">
+            <label class="toggle">
+              <span>Sound effects</span>
+              <input type="checkbox" data-setting="sound" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Music</span>
+              <input type="checkbox" data-setting="music" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Vibration</span>
+              <input type="checkbox" data-setting="haptics" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Auto-fire</span>
+              <input type="checkbox" data-setting="autofire" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Show FPS</span>
+              <input type="checkbox" data-setting="showFps" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <div class="segmented" role="radiogroup" aria-label="Touch control style">
+              <span class="segmented-label">Touch steering</span>
+              <div class="segmented-options">
+                <button type="button" data-control="drag">Relative drag</button>
+                <button type="button" data-control="follow">Follow finger</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary sheet-close" type="button" data-close>Done</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- hud -- -->
+      <div id="hud" class="hud is-hidden">
+        <button id="btn-pause" class="round-btn hud-pause" type="button" aria-label="Pause">❚❚</button>
+        <button id="btn-missile" class="round-btn hud-missile" type="button" aria-label="Fire missile">
+          <span class="missile-glyph">🚀</span>
+          <span id="missile-count" class="missile-count">3</span>
+        </button>
+        <p id="touch-hint" class="touch-hint">Drag to fly</p>
+      </div>
+
+      <!-- -------------------------------------------------------- paused -- -->
+      <section id="screen-paused" class="screen" aria-label="Paused">
+        <div class="sheet sheet-compact">
+          <h2>Paused</h2>
+          <div class="sheet-body">
+            <label class="toggle">
+              <span>Sound effects</span>
+              <input type="checkbox" data-setting="sound" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Music</span>
+              <input type="checkbox" data-setting="music" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="toggle">
+              <span>Auto-fire</span>
+              <input type="checkbox" data-setting="autofire" />
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+          </div>
+          <button id="btn-resume" class="btn btn-primary" type="button">Resume</button>
+          <div class="btn-row">
+            <button id="btn-restart" class="btn btn-ghost" type="button">Restart</button>
+            <button id="btn-quit" class="btn btn-ghost" type="button">Quit</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------- game over -- -->
+      <section id="screen-gameover" class="screen" aria-label="Game over">
+        <div class="sheet">
+          <h2 id="go-title">Game Over</h2>
+          <p id="go-rank" class="rank"></p>
+          <div class="result-grid">
+            <div><span>Score</span><b id="go-score">0</b></div>
+            <div><span>Wave</span><b id="go-wave">0</b></div>
+            <div><span>Chickens</span><b id="go-kills">0</b></div>
+            <div><span>Drumsticks</span><b id="go-food">0</b></div>
+            <div><span>Best</span><b id="go-best">0</b></div>
+            <div><span>Waves cleared</span><b id="go-waves">0</b></div>
+          </div>
+          <button id="btn-again" class="btn btn-primary" type="button">Play Again</button>
+          <button id="btn-menu" class="btn btn-ghost" type="button">Main Menu</button>
+        </div>
+      </section>
+    </div>
+
+    <noscript>
+      <p class="noscript-note">Chicken Attack needs JavaScript to run.</p>
+    </noscript>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
