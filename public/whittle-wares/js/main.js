@@ -1,6 +1,7 @@
 /* Whittle & Wares boot: input, the DOM half of the game, persistence, PWA. */
 
 import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, priceOutlook, priceCeiling, priceLabel, stockCapacity, DAYS_TARGET } from './game.js';
+import { orderSlots, orderFillable } from './economy.js';
 import { itemIcon, customerSprite } from './art.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 
@@ -212,17 +213,22 @@ function renderCraft(reason) {
     (reason ? `${reason} ` : '') + 'Turn materials into goods worth more than their parts.';
   const list = $('#craft-list');
   list.textContent = '';
+  const book = game.recipeBook();
   for (const id of Object.keys(RECIPES)) {
+    const known = book.includes(id);
     const li = document.createElement('li');
+    li.classList.toggle('is-owned', !known);
     li.append(icon(id));
     const nm = document.createElement('div');
     nm.className = 'nm';
     const b = document.createElement('b');
     b.textContent = `${ITEMS[id].name} · ${ITEMS[id].value} coin`;
     const sp = document.createElement('span');
-    sp.textContent = Object.entries(RECIPES[id])
-      .map(([k, v]) => `${v}x ${ITEMS[k].name} (have ${game.inv[k] || 0})`)
-      .join(', ');
+    sp.textContent = known
+      ? Object.entries(RECIPES[id])
+          .map(([k, v]) => `${v}x ${ITEMS[k].name} (have ${game.inv[k] || 0})`)
+          .join(', ')
+      : 'Needs the Master Bench';
     nm.append(b, sp);
     li.append(nm);
     const btn = document.createElement('button');
@@ -396,6 +402,7 @@ function renderEvening() {
     ['Sold', `${game.daySold} goods`],
     ["Today's takings", `${game.dayTakings} coin`],
     ['Walked out', `${game.dayWalkouts}`],
+    ['Commissions filled', `${game.ordersDone}`],
     ['Standing', reputationWord(game.rep)],
     ['In the purse', `${Math.round(game.gold)} coin`],
   ];
@@ -412,6 +419,8 @@ function renderEvening() {
     li.append(s, b);
     tally.append(li);
   }
+
+  renderOrders();
 
   const list = $('#upgrade-list');
   list.textContent = '';
@@ -459,6 +468,64 @@ function renderEvening() {
     note.classList.remove('is-due');
   }
 }
+
+/* Commissions: what settled on the way in, what is still owed, and the one on
+ * the table for tomorrow. */
+function renderOrders() {
+  const list = $('#order-list');
+  list.textContent = '';
+
+  for (const news of game.orderNews || []) {
+    const li = document.createElement('li');
+    li.className = news.ok ? 'order-news is-good' : 'order-news is-bad';
+    li.textContent = news.text;
+    list.append(li);
+  }
+
+  for (const o of game.orders) {
+    const have = game.inv[o.item] || 0;
+    const li = document.createElement('li');
+    li.className = 'order';
+    li.append(icon(o.item));
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    const b = document.createElement('b');
+    b.textContent = `${o.qty}× ${ITEMS[o.item].name} for ${o.from}`;
+    const sp = document.createElement('span');
+    const left = o.due - game.day;
+    sp.textContent = `${Math.min(have, o.qty)}/${o.qty} gathered · ${
+      left <= 0 ? 'due tomorrow' : `${left} day${left > 1 ? 's' : ''} left`
+    } · pays ${o.pay}`;
+    if (left <= 0) sp.className = 'cold';
+    nm.append(b, sp);
+    li.append(nm);
+    if (orderFillable(o, game.inv)) {
+      const tick = document.createElement('span');
+      tick.className = 'cost';
+      tick.textContent = 'ready';
+      li.append(tick);
+    }
+    list.append(li);
+  }
+
+  if (!game.orders.length && !(game.orderNews || []).length) {
+    const li = document.createElement('li');
+    li.className = 'order-news';
+    li.textContent = `Nothing owed. You may hold ${orderSlots(game.rep)} at a time.`;
+    list.append(li);
+  }
+
+  const offer = game.offer;
+  show($('#offer'), !!offer);
+  if (offer) {
+    const market = ITEMS[offer.item].value * offer.qty;
+    $('#offer-line').textContent =
+      `${offer.from} wants ${offer.qty}× ${ITEMS[offer.item].name} by day ${offer.due}, and will pay ${offer.pay} coin — about ${Math.round((offer.pay / market) * 100 - 100)}% over the market.`;
+  }
+}
+
+$('#btn-accept-order').addEventListener('click', () => game.takeOffer(true));
+$('#btn-decline').addEventListener('click', () => game.takeOffer(false));
 
 function reputationWord(rep) {
   if (rep >= 70) return 'beloved';

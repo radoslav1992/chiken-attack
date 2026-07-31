@@ -17,6 +17,7 @@ import {
   rentDue, RENT_EVERY, dailyMarket, customerCount, makeCustomer, evaluateOffer,
   repDelta, suggestedPrice, priceOutlook, priceCeiling, priceLabel,
   stockCapacity, maxStamina, nodeYield, canCraft, spoil, countStock,
+  openRecipes, makeOrder, orderSlots, orderFillable, ORDER_REP,
 } from './economy.js';
 import { generate, reachable, solid, TILE, MAP_W, MAP_H, T, bandOfRow } from './world.js';
 import { beaverFrame, waspSprite, tileArt, nodeSprite, blit, PAL } from './art.js';
@@ -106,6 +107,10 @@ export class Game {
     this.sold = 0;
     this.walkouts = 0;
     this.bestDay = 0;
+    this.orders = [];
+    this.offer = null;
+    this.ordersDone = 0;
+    this.ordersFailed = 0;
     this.coachDone = false;
     this.overReason = '';
     this.startDay();
@@ -117,6 +122,8 @@ export class Game {
       seed: this.seed, day: this.day, gold: this.gold, rep: this.rep,
       inv: this.inv, ages: this.ages, upgrades: this.upgrades, prices: this.prices,
       takings: this.takings, sold: this.sold, walkouts: this.walkouts,
+      orders: this.orders, offer: this.offer,
+      ordersDone: this.ordersDone, ordersFailed: this.ordersFailed,
     };
   }
 
@@ -133,6 +140,10 @@ export class Game {
     this.takings = s.takings || 0;
     this.sold = s.sold || 0;
     this.walkouts = s.walkouts || 0;
+    this.orders = s.orders || [];
+    this.offer = s.offer || null;
+    this.ordersDone = s.ordersDone || 0;
+    this.ordersFailed = s.ordersFailed || 0;
     this.coachDone = true; // a resumed run has already had its first morning
     this.overReason = '';
     this.startDay();
@@ -207,8 +218,25 @@ export class Game {
     if (this.stamina < this.maxStam * 0.25) {
       return `Nearly worn out. <b>Head back to the door</b> — ${sack} in the satchel.`;
     }
+    /* An accepted order is the morning's actual instruction, so it outranks the
+     * generic prompt. This is the whole reason orders exist: "gather things" is
+     * not a goal, "three clay pots by Thursday" is. */
+    const order = this.nextOrder();
+    if (order) {
+      const have = this.inv[order.item] || 0;
+      const left = Math.max(0, order.qty - have);
+      const days = order.due - this.day;
+      if (!left) return `Order filled — <b>take it home</b> for ${order.pay} coin.`;
+      return `Order: <b>${left} more ${ITEMS[order.item].name}</b> · ${days === 0 ? 'due today' : `${days} day${days > 1 ? 's' : ''} left`}`;
+    }
     if (!sack) return 'Walk onto a plant to gather it.';
     return `<b>${sack}</b> gathered. Head back to the door when you have enough.`;
+  }
+
+  /** The accepted order closest to its deadline. */
+  nextOrder() {
+    if (!this.orders || !this.orders.length) return null;
+    return this.orders.slice().sort((a, b) => a.due - b.due)[0];
   }
 
   sackCount() {
@@ -430,20 +458,73 @@ export class Game {
   goHome(reason) {
     this.coachDone = true;
     this.wasps.length = 0;
-    this.phase = this.upgrades.includes('bench') ? 'craft' : 'shop';
-    if (this.phase === 'shop') this.prepareShop();
-    this.emit('phase', this.phase, reason);
+    // Everyone has a bench now, so the craft step is always part of the day.
+    this.phase = 'craft';
+    this.emit('phase', 'craft', reason);
     this.emit('hud');
+  }
+
+  /* --- commissions ---------------------------------------------------------
+   * Settled the moment you get through the door, before the shop opens: goods
+   * handed over, coin paid, and anything past its date written off. Doing it
+   * here rather than at the counter means an order is a thing you come home
+   * with, not another button on another screen.
+   */
+  settleOrders() {
+    this.orderNews = [];
+    for (let i = this.orders.length - 1; i >= 0; i--) {
+      const o = this.orders[i];
+      if (orderFillable(o, this.inv)) {
+        this.inv[o.item] -= o.qty;
+        this.gold += o.pay;
+        this.takings += o.pay;
+        this.dayTakings += o.pay;
+        this.rep = clamp(this.rep + ORDER_REP.done, -60, 120);
+        this.ordersDone++;
+        this.orders.splice(i, 1);
+        this.orderNews.push({ ok: true, text: `${o.from} paid ${o.pay} coin for ${o.qty}× ${ITEMS[o.item].name}.` });
+        sfx.buy();
+      } else if (this.day > o.due) {
+        this.rep = clamp(this.rep + ORDER_REP.failed, -60, 120);
+        this.ordersFailed++;
+        this.orders.splice(i, 1);
+        this.orderNews.push({ ok: false, text: `${o.from} gave up waiting for ${o.qty}× ${ITEMS[o.item].name}.` });
+        sfx.walkout();
+      }
+    }
+  }
+
+  /** Put a commission on the table for tomorrow, if there is room for one. */
+  drawOffer() {
+    if (this.offer) return;
+    if (this.orders.length >= orderSlots(this.rep)) return;
+    this.offer = makeOrder(this.day + 1, this.rng, this.upgrades, this.orders.length);
+  }
+
+  takeOffer(accept) {
+    if (!this.offer) return;
+    if (accept) {
+      this.orders.push(this.offer);
+      sfx.coin();
+    } else {
+      sfx.ui();
+    }
+    this.offer = null;
+    this.emit('evening');
   }
 
   /* -------------------------------------------------------------- crafting -- */
 
+  recipeBook() {
+    return openRecipes(this.upgrades);
+  }
+
   craftable() {
-    return Object.keys(RECIPES).filter((id) => canCraft(this.inv, id));
+    return this.recipeBook().filter((id) => canCraft(this.inv, id, this.upgrades));
   }
 
   craft(id) {
-    if (!this.upgrades.includes('bench') || !canCraft(this.inv, id)) return false;
+    if (!canCraft(this.inv, id, this.upgrades)) return false;
     for (const k in RECIPES[id]) this.inv[k] -= RECIPES[id][k];
     this.inv[id] = (this.inv[id] || 0) + 1;
     sfx.craft();
@@ -452,9 +533,17 @@ export class Game {
   }
 
   doneCrafting() {
+    /* Order of operations, and it matters: craft, THEN deliver, THEN open up.
+     * Delivering before the bench meant a commission for three clay pots could
+     * never be filled by pots you made that afternoon — and the shop would then
+     * sell those pots, because the shelf stocks the most valuable goods first
+     * and a commissioned good is by definition a valuable one. The simulation
+     * showed it plainly: 5.5 orders lapsed for every 4 filled, and the goods
+     * that would have filled them had been sold over the counter. */
+    this.settleOrders();
     this.prepareShop();
     this.phase = 'shop';
-    this.emit('phase', 'shop');
+    this.emit('phase', 'shop', this.orderNews && this.orderNews.length ? this.orderNews[0].text : '');
   }
 
   /* ------------------------------------------------------------ the shop -- */
@@ -466,11 +555,18 @@ export class Game {
     const cap = stockCapacity(this.upgrades);
     this.shelf = {};
     let placed = 0;
+    /* Goods an outstanding commission is still waiting on never reach the
+     * shelves. Selling them would be the shop quietly sabotaging its own order,
+     * and the player would watch a commission lapse holding the exact goods it
+     * asked for. */
+    const reserved = {};
+    for (const o of this.orders) reserved[o.item] = (reserved[o.item] || 0) + o.qty;
     const order = Object.keys(this.inv)
       .filter((id) => this.inv[id] > 0)
       .sort((a, b) => ITEMS[b].value - ITEMS[a].value);
     for (const id of order) {
-      while (this.inv[id] > 0 && placed < cap) {
+      const keep = reserved[id] || 0;
+      while (this.inv[id] > keep && placed < cap) {
         this.shelf[id] = (this.shelf[id] || 0) + 1;
         this.inv[id]--;
         placed++;
@@ -583,6 +679,7 @@ export class Game {
     }
     this.spoiled = spoil(this.inv, this.ages);
     if (Object.keys(this.spoiled).length) sfx.spoil();
+    this.drawOffer();
     this.phase = 'evening';
     this.emit('phase', 'evening');
     this.emit('hud');
@@ -637,6 +734,7 @@ export class Game {
       reason: this.overReason,
       upgrades: this.upgrades.slice(),
       sold: this.sold,
+      ordersDone: this.ordersDone,
     });
   }
 

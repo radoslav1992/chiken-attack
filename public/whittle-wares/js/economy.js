@@ -92,6 +92,17 @@ export const RECIPES = {
   charm: { amber: 1, resin: 1, bark: 1 },
 };
 
+/** The two the Master Bench adds. Everything else you can make from day one. */
+export const MASTER_RECIPES = ['hatchet', 'charm'];
+
+export function recipeOpen(id, upgrades) {
+  return !MASTER_RECIPES.includes(id) || upgrades.includes('masterBench');
+}
+
+export function openRecipes(upgrades) {
+  return Object.keys(RECIPES).filter((id) => recipeOpen(id, upgrades));
+}
+
 /** What the materials for one of these cost at standing value. */
 export function recipeCost(id) {
   const r = RECIPES[id];
@@ -101,9 +112,9 @@ export function recipeCost(id) {
   return sum;
 }
 
-export function canCraft(inv, id) {
+export function canCraft(inv, id, upgrades = []) {
   const r = RECIPES[id];
-  if (!r) return false;
+  if (!r || !recipeOpen(id, upgrades)) return false;
   for (const k in r) if ((inv[k] || 0) < r[k]) return false;
   return true;
 }
@@ -115,7 +126,12 @@ export function canCraft(inv, id) {
  */
 export const UPGRADES = [
   { id: 'boots', name: 'Oiled Boots', cost: 120, blurb: '+30 stamina. More time in the wood each morning.' },
-  { id: 'bench', name: 'Workbench', cost: 220, blurb: 'Craft goods from materials. Crafted goods are where the money is.' },
+  /* The workbench used to be a 220-coin upgrade, which measured out at a median
+   * of day FOUR before a player could craft anything at all. Three days of "walk
+   * out, pick things up, sell them" is the whole game for most of a first
+   * session, and it is not enough of one. Everyone has a bench now; what you buy
+   * is the good half of the recipe book. */
+  { id: 'masterBench', name: 'Master Bench', cost: 260, blurb: 'Unlocks the Flint Hatchet and Amber Charm — the two best things you can make.' },
   { id: 'shelves', name: 'Wider Shelves', cost: 160, blurb: 'Shop holds 22 goods instead of 12.' },
   { id: 'sign', name: 'Painted Sign', cost: 200, blurb: '+4 customers a day.' },
   { id: 'axe', name: 'Steel Axe', cost: 240, blurb: 'Opens the Ironwood Stand, and every node gives one more.' },
@@ -354,3 +370,74 @@ export function spoil(inv, ages) {
   }
   return lost;
 }
+
+/* --- Commissions -----------------------------------------------------------
+ * The reason to walk out of the door on a particular morning.
+ *
+ * Without these a day has no shape: you gather whatever you pass, sell whatever
+ * you gathered, and the only clock is a rent five days away. An order names a
+ * good, a number and a date, pays roughly twice the market for it, and turns the
+ * morning from "collect things" into "collect THESE things, by Thursday" — which
+ * is the difference between a shop and a treadmill.
+ *
+ * They are deliberately larger than a single day's gathering, so taking one is a
+ * commitment across days rather than a free bonus for what you happened to pick
+ * up.
+ */
+
+const ORDER_NAMES = [
+  'the Ferryman', 'Widow Thorn', 'the Miller', 'Bracken Hall', 'the Ford Inn',
+  'the Charcoal Burner', 'Sister Wren', 'the Bell Foundry', 'the Roadwarden',
+];
+
+/** Everything the player could plausibly supply right now. */
+export function supplyable(upgrades) {
+  const raw = new Set();
+  for (const z of ZONES) {
+    if (!zoneOpen(z, upgrades)) continue;
+    for (const item of z.items) raw.add(item);
+  }
+  /* Only things worth commissioning. A standing order for four bits of bark
+   * pays 22 coin and reads as an errand; the point of an order is to be a reason
+   * to plan a morning around it. */
+  const out = [...raw].filter((id) => ITEMS[id].value >= 9);
+  for (const id of openRecipes(upgrades)) {
+    if (Object.keys(RECIPES[id]).every((k) => raw.has(k))) out.push(id);
+  }
+  return out;
+}
+
+/** Days you are given to fill an order, and what it pays over the market. */
+const ORDER_DAYS = 3;
+const ORDER_MULT = 1.85;
+
+export function makeOrder(day, rng, upgrades, seq = 0) {
+  const pool = supplyable(upgrades);
+  /* Weighted toward things you have to MAKE rather than merely find, because a
+   * commission for four bits of bark is not a plan, it is an errand. */
+  const weights = pool.map((id) => (ITEMS[id].crafted ? 3 : ITEMS[id].value >= 14 ? 2 : 1));
+  const item = rng.weighted(pool, weights);
+  const qty = ITEMS[item].crafted ? rng.int(2, 3) : rng.int(3, 6);
+  const pay = Math.round(ITEMS[item].value * qty * ORDER_MULT);
+  return {
+    id: `${day}-${seq}`,
+    from: rng.pick(ORDER_NAMES),
+    item,
+    qty,
+    due: day + ORDER_DAYS,
+    pay,
+  };
+}
+
+/** How many commissions you may hold at once. A second opens up once you are
+ *  known well enough for two people to ask on the same week. */
+export function orderSlots(rep) {
+  return rep >= 45 ? 2 : 1;
+}
+
+export function orderFillable(order, inv) {
+  return (inv[order.item] || 0) >= order.qty;
+}
+
+/** Reputation swing for delivering, and for letting one lapse. */
+export const ORDER_REP = { done: 6, failed: -8 };
