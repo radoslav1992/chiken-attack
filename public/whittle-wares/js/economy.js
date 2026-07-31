@@ -276,6 +276,47 @@ export function suggestedPrice(id, market) {
   return Math.max(1, Math.round(ITEMS[id].value * market.mult[id]));
 }
 
+/* --- What a price will actually do ----------------------------------------
+ * Derived from the very distribution makeCustomer draws from, rather than
+ * guessed at: taste is uniform over [0.78, 1.32] and patience over [1.15, 1.4],
+ * so for a given price the share of customers who buy outright, haggle, or walk
+ * straight out is arithmetic.
+ *
+ * This exists because the pricing screen used to be a number with two arrows and
+ * no consequence attached. You could hold + until the price was in the
+ * thousands, and nothing on screen suggested that was different from holding it
+ * until the price was fair — the entire decision the game is built around was
+ * invisible until the customers had already walked.
+ */
+const TASTE_LO = 0.78;
+const TASTE_HI = 1.32;
+const PATIENCE_MID = 1.275;
+
+export function priceOutlook(id, price, market, rep = 0) {
+  const repFactor = 1 + Math.max(-0.18, Math.min(0.22, rep / 500));
+  const centre = Math.max(1, ITEMS[id].value * market.mult[id] * repFactor);
+  const share = (r) => Math.max(0, Math.min(1, (TASTE_HI - r) / (TASTE_HI - TASTE_LO)));
+  const buy = share(price / centre);
+  const upTo = share(price / centre / PATIENCE_MID);
+  const haggle = Math.max(0, upTo - buy);
+  return { centre, buy, haggle, leave: Math.max(0, 1 - buy - haggle) };
+}
+
+/** The most the stepper will let you ask. Past about 1.32x the going rate not one
+ *  customer in the wood will pay, so anything beyond twice it is a typo. */
+export function priceCeiling(id, market) {
+  return Math.max(2, Math.round(suggestedPrice(id, market) * 2));
+}
+
+/** A short verdict for the label beside the price. */
+export function priceLabel(outlook) {
+  if (outlook.buy >= 0.85) return { text: 'Everyone will take it', tone: 'cheap' };
+  if (outlook.buy >= 0.5) return { text: 'Most will buy', tone: 'good' };
+  if (outlook.buy + outlook.haggle >= 0.65) return { text: 'Expect haggling', tone: 'fair' };
+  if (outlook.buy + outlook.haggle >= 0.3) return { text: 'Many will walk out', tone: 'dear' };
+  return { text: 'Nobody will pay this', tone: 'bad' };
+}
+
 export function stockCapacity(upgrades) {
   return upgrades.includes('shelves') ? 22 : 12;
 }

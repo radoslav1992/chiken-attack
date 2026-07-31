@@ -15,8 +15,8 @@
 import {
   makeRng, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, ZONES, zoneOpen,
   rentDue, RENT_EVERY, dailyMarket, customerCount, makeCustomer, evaluateOffer,
-  repDelta, suggestedPrice, stockCapacity, maxStamina, nodeYield, canCraft,
-  spoil, countStock,
+  repDelta, suggestedPrice, priceOutlook, priceCeiling, priceLabel,
+  stockCapacity, maxStamina, nodeYield, canCraft, spoil, countStock,
 } from './economy.js';
 import { generate, reachable, solid, TILE, MAP_W, MAP_H, T, bandOfRow } from './world.js';
 import { beaverFrame, waspSprite, tileArt, nodeSprite, blit, PAL } from './art.js';
@@ -106,6 +106,7 @@ export class Game {
     this.sold = 0;
     this.walkouts = 0;
     this.bestDay = 0;
+    this.coachDone = false;
     this.overReason = '';
     this.startDay();
   }
@@ -132,6 +133,7 @@ export class Game {
     this.takings = s.takings || 0;
     this.sold = s.sold || 0;
     this.walkouts = s.walkouts || 0;
+    this.coachDone = true; // a resumed run has already had its first morning
     this.overReason = '';
     this.startDay();
     return true;
@@ -183,6 +185,45 @@ export class Game {
   say(text, t = 2.2) {
     this.hint = text;
     this.hintT = t;
+  }
+
+  /* --- telling the player what to do ---------------------------------------
+   * The morning used to state its goal nowhere at all. You were dropped into a
+   * wood with a stamina bar and no sentence anywhere on screen saying that the
+   * point was to fill the satchel and walk back — so the honest report was "I
+   * only collect some stuff and nothing else".
+   */
+
+  /** How far the shop door is, in paces, and which way it lies. */
+  homeInfo() {
+    const dx = this.map.spawn.x * TILE + TILE / 2 - this.px;
+    const dy = (this.map.spawn.y + 1) * TILE + TILE / 2 - this.py;
+    return { dx, dy, paces: Math.round(Math.hypot(dx, dy) / TILE), angle: Math.atan2(dy, dx) };
+  }
+
+  /** The one-line objective, always on screen while foraging. */
+  objective() {
+    const sack = this.sackCount();
+    if (this.stamina < this.maxStam * 0.25) {
+      return `Nearly worn out. <b>Head back to the door</b> — ${sack} in the satchel.`;
+    }
+    if (!sack) return 'Walk onto a plant to gather it.';
+    return `<b>${sack}</b> gathered. Head back to the door when you have enough.`;
+  }
+
+  sackCount() {
+    let n = 0;
+    for (const k in this.inv) n += this.inv[k];
+    return n;
+  }
+
+  /** The first morning walks you through it, once, and then never again. */
+  coach() {
+    if (this.coachDone) return null;
+    if (this.day > 1) return null;
+    if (this.gathered === 0) return 'Drag anywhere to walk. Stand on a plant and it comes up on its own — there is no button.';
+    if (this.gathered < 3) return 'The green bar is your stamina. Walking spends it as well as gathering, and when it runs out you are carried home.';
+    return 'That is a morning\'s work. Walk back to the <b>shop door</b> at the bottom — whatever is in the satchel is what you sell tonight.';
   }
 
   /* ------------------------------------------------------------ the loop -- */
@@ -387,6 +428,7 @@ export class Game {
 
   /** End the morning wherever the player is. */
   goHome(reason) {
+    this.coachDone = true;
     this.wasps.length = 0;
     this.phase = this.upgrades.includes('bench') ? 'craft' : 'shop';
     if (this.phase === 'shop') this.prepareShop();
@@ -444,7 +486,11 @@ export class Game {
   }
 
   setPrice(id, v) {
-    this.prices[id] = Math.max(1, Math.round(v));
+    /* Bounded at both ends. Unbounded, the stepper would happily take a resin
+     * worth 10 coin up into the thousands — which is not a strategy, it is a
+     * broken control, and it made the pricing screen feel like it did nothing. */
+    const cap = priceCeiling(id, this.market);
+    this.prices[id] = Math.max(1, Math.min(cap, Math.round(v)));
     this.emit('shop');
   }
 
@@ -607,7 +653,12 @@ export class Game {
     const viewW = this.w / z;
     const viewH = this.h / z;
     const camX = clamp(this.px - viewW / 2, 0, MAP_W * TILE - viewW);
-    const camY = clamp(this.py - viewH / 2, 0, MAP_H * TILE - viewH);
+    /* The camera may run PAST the bottom of the map by the height of the
+     * objective strip. Clamped exactly at the map's edge, a beaver standing at
+     * the shop door — which is the last row — was drawn underneath the strip and
+     * simply disappeared at the moment the player most wanted to see it. */
+    const BOTTOM_UI = 96 / z;
+    const camY = clamp(this.py - viewH / 2, 0, MAP_H * TILE - viewH + BOTTOM_UI);
 
     ctx.save();
     ctx.scale(z, z);
@@ -695,33 +746,54 @@ export class Game {
     ctx.fillStyle = zoneOpen(zone, this.upgrades) ? '#e9f3df' : '#ffb08a';
     ctx.fillText(label, 19, top + 17);
 
-    // A compass to the door, because the map is tall and it is easy to lose it.
-    const doorY = (MAP_H - 2) * TILE;
-    if (this.py < doorY - 120) {
-      ctx.fillStyle = 'rgba(8,14,10,0.6)';
-      ctx.fillRect(this.w - 46, this.h - 46, 36, 36);
+    /* A compass to the door, always on and pointing the actual way home. It used
+     * to appear only when you were already far away, and it always pointed
+     * straight down whichever way the door really was — a compass that is
+     * sometimes absent and otherwise wrong. */
+    const home = this.homeInfo();
+    if (home.paces > 2) {
+      const cx = this.w - 34;
+      const cy = 96;
+      ctx.fillStyle = 'rgba(8,14,10,0.72)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,217,138,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(home.angle + Math.PI / 2);
       ctx.fillStyle = '#ffd98a';
       ctx.beginPath();
-      ctx.moveTo(this.w - 28, this.h - 16);
-      ctx.lineTo(this.w - 35, this.h - 30);
-      ctx.lineTo(this.w - 21, this.h - 30);
+      ctx.moveTo(0, 11);
+      ctx.lineTo(-8, -6);
+      ctx.lineTo(0, -2);
+      ctx.lineTo(8, -6);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
     }
 
+    /* Transient announcements sit at the TOP. The bottom of the screen is now the
+     * standing objective and the first-morning coach card, and at the old
+     * position this banner printed straight through both of them. */
     if (this.hintT > 0) {
       ctx.globalAlpha = clamp(this.hintT, 0, 1);
       ctx.textAlign = 'center';
-      ctx.font = '600 14px ui-rounded, system-ui, sans-serif';
+      ctx.font = '600 13px ui-rounded, system-ui, sans-serif';
       const t = this.hint;
-      const w = ctx.measureText(t).width + 26;
-      ctx.fillStyle = 'rgba(8,14,10,0.82)';
-      ctx.fillRect((this.w - w) / 2, this.h - 92, w, 30);
+      const w = Math.min(this.w - 20, ctx.measureText(t).width + 26);
+      ctx.fillStyle = 'rgba(8,14,10,0.86)';
+      ctx.fillRect((this.w - w) / 2, 100, w, 28);
       ctx.fillStyle = '#ffe9b8';
-      ctx.fillText(t, this.w / 2, this.h - 72);
+      ctx.fillText(t, this.w / 2, 119);
       ctx.globalAlpha = 1;
     }
   }
 }
 
-export { ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, ZONES, rentDue, RENT_EVERY, suggestedPrice, countStock, stockCapacity, PAL };
+export {
+  ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, ZONES, rentDue, RENT_EVERY,
+  suggestedPrice, priceOutlook, priceCeiling, priceLabel, countStock, stockCapacity, PAL,
+};

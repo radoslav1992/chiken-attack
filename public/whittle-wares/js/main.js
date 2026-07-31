@@ -1,6 +1,6 @@
 /* Whittle & Wares boot: input, the DOM half of the game, persistence, PWA. */
 
-import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, stockCapacity, DAYS_TARGET } from './game.js';
+import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, priceOutlook, priceCeiling, priceLabel, stockCapacity, DAYS_TARGET } from './game.js';
 import { itemIcon, customerSprite } from './art.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 
@@ -127,7 +127,43 @@ const hudDay = $('#hud-day');
 const hudGold = $('#hud-gold');
 const hudSack = $('#hud-sack');
 
+const objEl = $('#objective');
+const objText = $('#obj-text');
+const objHome = $('#obj-home');
+const coachEl = $('#coach');
+let lastCoach = null;
+
+/* The forage strip: what to do, and how far the door is. Rebuilt on every HUD
+ * tick but only written when the text actually changes, because this runs at
+ * frame rate and setting textContent every frame is a layout thrash for nothing. */
+function renderObjective() {
+  const foraging = game.phase === 'forage';
+  show(objEl, foraging);
+  show(coachEl, foraging && !!game.coach());
+  if (!foraging) return;
+
+  const html = game.objective();
+  if (objText.dataset.v !== html) {
+    objText.dataset.v = html;
+    // Only <b> is ever produced, by objective() itself — no user text reaches here.
+    objText.innerHTML = html;
+  }
+
+  const home = game.homeInfo();
+  const atDoor = home.paces <= 2;
+  const label = atDoor ? '✓ at the door' : `↩ door · ${home.paces} paces`;
+  if (objHome.textContent !== label) objHome.textContent = label;
+  objEl.classList.toggle('is-home', atDoor);
+
+  const tip = game.coach();
+  if (tip !== lastCoach) {
+    lastCoach = tip;
+    if (tip) coachEl.innerHTML = tip;
+  }
+}
+
 game.on('hud', () => {
+  renderObjective();
   hudDay.textContent = `Day ${game.day}`;
   hudGold.textContent = Math.round(game.gold).toLocaleString('en-US');
   const frac = game.maxStam ? Math.max(0, game.stamina / game.maxStam) : 1;
@@ -144,8 +180,11 @@ game.on('hud', () => {
 game.on('phase', (phase, reason) => {
   if (phase === 'forage') {
     showOnly('forage');
+    renderObjective();
     return;
   }
+  show(objEl, false);
+  show(coachEl, false);
   if (phase === 'craft') {
     renderCraft(reason);
     showOnly('craft');
@@ -236,6 +275,24 @@ function renderShop(reason) {
     nm.append(b, sp);
     li.append(nm);
 
+    /* The outlook bar. Three segments — will buy, will haggle, will walk — sized
+     * from the same distribution the customers are drawn from. This is the
+     * feedback the screen was missing: before it, the price was a number with two
+     * arrows and no stated consequence, so raising it read exactly like lowering
+     * it right up until the customers had already gone. */
+    const outlook = document.createElement('div');
+    outlook.className = 'outlook';
+    const segBuy = document.createElement('i');
+    segBuy.className = 'seg seg-buy';
+    const segHag = document.createElement('i');
+    segHag.className = 'seg seg-haggle';
+    const segOut = document.createElement('i');
+    segOut.className = 'seg seg-out';
+    outlook.append(segBuy, segHag, segOut);
+    const verdict = document.createElement('span');
+    verdict.className = 'verdict';
+    nm.append(outlook, verdict);
+
     const dec = document.createElement('button');
     dec.type = 'button';
     dec.className = 'mini';
@@ -243,24 +300,39 @@ function renderShop(reason) {
     dec.setAttribute('aria-label', `Lower the price of ${ITEMS[id].name}`);
     const val = document.createElement('span');
     val.className = 'price';
-    val.textContent = game.prices[id];
     const inc = document.createElement('button');
     inc.type = 'button';
     inc.className = 'mini';
     inc.textContent = '+';
     inc.setAttribute('aria-label', `Raise the price of ${ITEMS[id].name}`);
 
+    const ceiling = priceCeiling(id, m);
+    const paint = () => {
+      const price = game.prices[id];
+      val.textContent = price;
+      const o = priceOutlook(id, price, m, game.rep);
+      const lab = priceLabel(o);
+      segBuy.style.setProperty('--w', `${(o.buy * 100).toFixed(1)}%`);
+      segHag.style.setProperty('--w', `${(o.haggle * 100).toFixed(1)}%`);
+      segOut.style.setProperty('--w', `${(o.leave * 100).toFixed(1)}%`);
+      verdict.textContent = lab.text;
+      verdict.dataset.tone = lab.tone;
+      dec.disabled = price <= 1;
+      inc.disabled = price >= ceiling;
+    };
+
     const step = Math.max(1, Math.round(sug * 0.1));
     dec.addEventListener('click', () => {
       game.setPrice(id, game.prices[id] - step);
-      val.textContent = game.prices[id];
+      paint();
       sfx.ui();
     });
     inc.addEventListener('click', () => {
       game.setPrice(id, game.prices[id] + step);
-      val.textContent = game.prices[id];
+      paint();
       sfx.ui();
     });
+    paint();
     li.append(dec, val, inc);
     list.append(li);
   }
@@ -268,9 +340,9 @@ function renderShop(reason) {
   const cap = stockCapacity(game.upgrades);
   let held = 0;
   for (const k in game.inv) held += game.inv[k];
-  $('#shop-note').textContent = held
-    ? `${held} more in the back — the shelves only hold ${cap}.`
-    : `The shelves hold ${cap}.`;
+  const backroom = held ? `${held} more in the back — the shelves only hold ${cap}. ` : '';
+  $('#shop-note').textContent =
+    `${backroom}Green is buyers, amber hagglers, red walkouts. Open up and the day's customers come in one at a time.`;
 }
 
 $('#btn-open').addEventListener('click', () => {
@@ -574,6 +646,8 @@ $('#btn-continue').addEventListener('click', () => {
 });
 
 function refreshMenu() {
+  // Nothing else on the menu said what a day consists of.
+
   const best = store.get(BEST_KEY, { score: 0, day: 0 });
   $('#menu-best').textContent = best.score
     ? `Best: ${best.score.toLocaleString('en-US')} coin taken, day ${best.day}`
