@@ -1,6 +1,7 @@
 /* Whittle & Wares boot: input, the DOM half of the game, persistence, PWA. */
 
-import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, stockCapacity, DAYS_TARGET } from './game.js';
+import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, priceOutlook, priceCeiling, priceLabel, stockCapacity, DAYS_TARGET } from './game.js';
+import { orderSlots, orderFillable } from './economy.js';
 import { itemIcon, customerSprite } from './art.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 
@@ -127,7 +128,43 @@ const hudDay = $('#hud-day');
 const hudGold = $('#hud-gold');
 const hudSack = $('#hud-sack');
 
+const objEl = $('#objective');
+const objText = $('#obj-text');
+const objHome = $('#obj-home');
+const coachEl = $('#coach');
+let lastCoach = null;
+
+/* The forage strip: what to do, and how far the door is. Rebuilt on every HUD
+ * tick but only written when the text actually changes, because this runs at
+ * frame rate and setting textContent every frame is a layout thrash for nothing. */
+function renderObjective() {
+  const foraging = game.phase === 'forage';
+  show(objEl, foraging);
+  show(coachEl, foraging && !!game.coach());
+  if (!foraging) return;
+
+  const html = game.objective();
+  if (objText.dataset.v !== html) {
+    objText.dataset.v = html;
+    // Only <b> is ever produced, by objective() itself — no user text reaches here.
+    objText.innerHTML = html;
+  }
+
+  const home = game.homeInfo();
+  const atDoor = home.paces <= 2;
+  const label = atDoor ? '✓ at the door' : `↩ door · ${home.paces} paces`;
+  if (objHome.textContent !== label) objHome.textContent = label;
+  objEl.classList.toggle('is-home', atDoor);
+
+  const tip = game.coach();
+  if (tip !== lastCoach) {
+    lastCoach = tip;
+    if (tip) coachEl.innerHTML = tip;
+  }
+}
+
 game.on('hud', () => {
+  renderObjective();
   hudDay.textContent = `Day ${game.day}`;
   hudGold.textContent = Math.round(game.gold).toLocaleString('en-US');
   const frac = game.maxStam ? Math.max(0, game.stamina / game.maxStam) : 1;
@@ -144,8 +181,11 @@ game.on('hud', () => {
 game.on('phase', (phase, reason) => {
   if (phase === 'forage') {
     showOnly('forage');
+    renderObjective();
     return;
   }
+  show(objEl, false);
+  show(coachEl, false);
   if (phase === 'craft') {
     renderCraft(reason);
     showOnly('craft');
@@ -173,17 +213,22 @@ function renderCraft(reason) {
     (reason ? `${reason} ` : '') + 'Turn materials into goods worth more than their parts.';
   const list = $('#craft-list');
   list.textContent = '';
+  const book = game.recipeBook();
   for (const id of Object.keys(RECIPES)) {
+    const known = book.includes(id);
     const li = document.createElement('li');
+    li.classList.toggle('is-owned', !known);
     li.append(icon(id));
     const nm = document.createElement('div');
     nm.className = 'nm';
     const b = document.createElement('b');
     b.textContent = `${ITEMS[id].name} · ${ITEMS[id].value} coin`;
     const sp = document.createElement('span');
-    sp.textContent = Object.entries(RECIPES[id])
-      .map(([k, v]) => `${v}x ${ITEMS[k].name} (have ${game.inv[k] || 0})`)
-      .join(', ');
+    sp.textContent = known
+      ? Object.entries(RECIPES[id])
+          .map(([k, v]) => `${v}x ${ITEMS[k].name} (have ${game.inv[k] || 0})`)
+          .join(', ')
+      : 'Needs the Master Bench';
     nm.append(b, sp);
     li.append(nm);
     const btn = document.createElement('button');
@@ -236,6 +281,24 @@ function renderShop(reason) {
     nm.append(b, sp);
     li.append(nm);
 
+    /* The outlook bar. Three segments — will buy, will haggle, will walk — sized
+     * from the same distribution the customers are drawn from. This is the
+     * feedback the screen was missing: before it, the price was a number with two
+     * arrows and no stated consequence, so raising it read exactly like lowering
+     * it right up until the customers had already gone. */
+    const outlook = document.createElement('div');
+    outlook.className = 'outlook';
+    const segBuy = document.createElement('i');
+    segBuy.className = 'seg seg-buy';
+    const segHag = document.createElement('i');
+    segHag.className = 'seg seg-haggle';
+    const segOut = document.createElement('i');
+    segOut.className = 'seg seg-out';
+    outlook.append(segBuy, segHag, segOut);
+    const verdict = document.createElement('span');
+    verdict.className = 'verdict';
+    nm.append(outlook, verdict);
+
     const dec = document.createElement('button');
     dec.type = 'button';
     dec.className = 'mini';
@@ -243,24 +306,39 @@ function renderShop(reason) {
     dec.setAttribute('aria-label', `Lower the price of ${ITEMS[id].name}`);
     const val = document.createElement('span');
     val.className = 'price';
-    val.textContent = game.prices[id];
     const inc = document.createElement('button');
     inc.type = 'button';
     inc.className = 'mini';
     inc.textContent = '+';
     inc.setAttribute('aria-label', `Raise the price of ${ITEMS[id].name}`);
 
+    const ceiling = priceCeiling(id, m);
+    const paint = () => {
+      const price = game.prices[id];
+      val.textContent = price;
+      const o = priceOutlook(id, price, m, game.rep);
+      const lab = priceLabel(o);
+      segBuy.style.setProperty('--w', `${(o.buy * 100).toFixed(1)}%`);
+      segHag.style.setProperty('--w', `${(o.haggle * 100).toFixed(1)}%`);
+      segOut.style.setProperty('--w', `${(o.leave * 100).toFixed(1)}%`);
+      verdict.textContent = lab.text;
+      verdict.dataset.tone = lab.tone;
+      dec.disabled = price <= 1;
+      inc.disabled = price >= ceiling;
+    };
+
     const step = Math.max(1, Math.round(sug * 0.1));
     dec.addEventListener('click', () => {
       game.setPrice(id, game.prices[id] - step);
-      val.textContent = game.prices[id];
+      paint();
       sfx.ui();
     });
     inc.addEventListener('click', () => {
       game.setPrice(id, game.prices[id] + step);
-      val.textContent = game.prices[id];
+      paint();
       sfx.ui();
     });
+    paint();
     li.append(dec, val, inc);
     list.append(li);
   }
@@ -268,9 +346,9 @@ function renderShop(reason) {
   const cap = stockCapacity(game.upgrades);
   let held = 0;
   for (const k in game.inv) held += game.inv[k];
-  $('#shop-note').textContent = held
-    ? `${held} more in the back — the shelves only hold ${cap}.`
-    : `The shelves hold ${cap}.`;
+  const backroom = held ? `${held} more in the back — the shelves only hold ${cap}. ` : '';
+  $('#shop-note').textContent =
+    `${backroom}Green is buyers, amber hagglers, red walkouts. Open up and the day's customers come in one at a time.`;
 }
 
 $('#btn-open').addEventListener('click', () => {
@@ -324,6 +402,7 @@ function renderEvening() {
     ['Sold', `${game.daySold} goods`],
     ["Today's takings", `${game.dayTakings} coin`],
     ['Walked out', `${game.dayWalkouts}`],
+    ['Commissions filled', `${game.ordersDone}`],
     ['Standing', reputationWord(game.rep)],
     ['In the purse', `${Math.round(game.gold)} coin`],
   ];
@@ -340,6 +419,8 @@ function renderEvening() {
     li.append(s, b);
     tally.append(li);
   }
+
+  renderOrders();
 
   const list = $('#upgrade-list');
   list.textContent = '';
@@ -387,6 +468,64 @@ function renderEvening() {
     note.classList.remove('is-due');
   }
 }
+
+/* Commissions: what settled on the way in, what is still owed, and the one on
+ * the table for tomorrow. */
+function renderOrders() {
+  const list = $('#order-list');
+  list.textContent = '';
+
+  for (const news of game.orderNews || []) {
+    const li = document.createElement('li');
+    li.className = news.ok ? 'order-news is-good' : 'order-news is-bad';
+    li.textContent = news.text;
+    list.append(li);
+  }
+
+  for (const o of game.orders) {
+    const have = game.inv[o.item] || 0;
+    const li = document.createElement('li');
+    li.className = 'order';
+    li.append(icon(o.item));
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    const b = document.createElement('b');
+    b.textContent = `${o.qty}× ${ITEMS[o.item].name} for ${o.from}`;
+    const sp = document.createElement('span');
+    const left = o.due - game.day;
+    sp.textContent = `${Math.min(have, o.qty)}/${o.qty} gathered · ${
+      left <= 0 ? 'due tomorrow' : `${left} day${left > 1 ? 's' : ''} left`
+    } · pays ${o.pay}`;
+    if (left <= 0) sp.className = 'cold';
+    nm.append(b, sp);
+    li.append(nm);
+    if (orderFillable(o, game.inv)) {
+      const tick = document.createElement('span');
+      tick.className = 'cost';
+      tick.textContent = 'ready';
+      li.append(tick);
+    }
+    list.append(li);
+  }
+
+  if (!game.orders.length && !(game.orderNews || []).length) {
+    const li = document.createElement('li');
+    li.className = 'order-news';
+    li.textContent = `Nothing owed. You may hold ${orderSlots(game.rep)} at a time.`;
+    list.append(li);
+  }
+
+  const offer = game.offer;
+  show($('#offer'), !!offer);
+  if (offer) {
+    const market = ITEMS[offer.item].value * offer.qty;
+    $('#offer-line').textContent =
+      `${offer.from} wants ${offer.qty}× ${ITEMS[offer.item].name} by day ${offer.due}, and will pay ${offer.pay} coin — about ${Math.round((offer.pay / market) * 100 - 100)}% over the market.`;
+  }
+}
+
+$('#btn-accept-order').addEventListener('click', () => game.takeOffer(true));
+$('#btn-decline').addEventListener('click', () => game.takeOffer(false));
 
 function reputationWord(rep) {
   if (rep >= 70) return 'beloved';
@@ -574,6 +713,8 @@ $('#btn-continue').addEventListener('click', () => {
 });
 
 function refreshMenu() {
+  // Nothing else on the menu said what a day consists of.
+
   const best = store.get(BEST_KEY, { score: 0, day: 0 });
   $('#menu-best').textContent = best.score
     ? `Best: ${best.score.toLocaleString('en-US')} coin taken, day ${best.day}`

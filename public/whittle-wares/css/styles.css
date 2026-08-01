@@ -194,6 +194,44 @@ body {
   line-height: 1.45;
 }
 
+/* The day's shape, on the title screen. Four lines is cheaper than a tutorial
+ * and it is the question the player actually had: what am I supposed to do? */
+.loop {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 16px;
+  padding: 0;
+  text-align: left;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.loop li {
+  counter-increment: step;
+  display: flex;
+  gap: 9px;
+  padding: 5px 0;
+  line-height: 1.4;
+}
+
+.loop li::before {
+  content: counter(step);
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border-radius: 99px;
+  background: rgba(121, 196, 106, 0.2);
+  color: var(--leaf);
+  font-weight: 700;
+  font-size: 11px;
+  text-align: center;
+  line-height: 19px;
+}
+
+.loop b {
+  color: var(--ink);
+}
+
 .best {
   margin: 0 0 14px;
   color: var(--gold);
@@ -338,6 +376,73 @@ body {
 
 .list .cold {
   color: var(--rust);
+}
+
+/* The price outlook: three segments across the row showing what a price will do.
+ * Widths come from a custom property set by JS — CSSOM, not a style attribute,
+ * so the CSP has nothing to refuse. */
+.outlook {
+  display: flex;
+  width: 100%;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.outlook .seg {
+  width: var(--w, 0%);
+  transition: width 0.12s ease-out;
+}
+
+.seg-buy {
+  background: var(--leaf);
+}
+
+.seg-haggle {
+  background: var(--gold);
+}
+
+.seg-out {
+  background: var(--red);
+}
+
+.verdict {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim);
+}
+
+.verdict[data-tone='cheap'] {
+  color: #8fd0ff;
+}
+
+.verdict[data-tone='good'] {
+  color: var(--leaf);
+}
+
+.verdict[data-tone='fair'] {
+  color: var(--gold);
+}
+
+.verdict[data-tone='dear'] {
+  color: var(--rust);
+}
+
+.verdict[data-tone='bad'] {
+  color: var(--red);
+}
+
+.list-price li {
+  align-items: flex-start;
+}
+
+.list-price .mini,
+.list-price .price {
+  margin-top: 2px;
 }
 
 .mini {
@@ -520,4 +625,168 @@ body {
   .btn:active {
     transform: none;
   }
+}
+
+
+/* ------------------------------------------------------- forage objective -- */
+
+/* "I have no idea what to do, I only collect some stuff and nothing else" —
+ * the morning had no stated goal anywhere on screen, so this says it, all the
+ * time, and counts down the walk home. */
+.objective {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(8, 14, 10, 0.82);
+  border: 1px solid var(--line);
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.objective b {
+  color: var(--gold);
+}
+
+.objective .obj-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.objective .obj-home {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: rgba(255, 194, 74, 0.14);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.objective.is-home .obj-home {
+  background: rgba(121, 196, 106, 0.2);
+  color: var(--leaf);
+}
+
+/* The first morning walks you through it, one line at a time. */
+.coach {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px);
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(56, 84, 48, 0.96), rgba(30, 48, 28, 0.96));
+  border: 1px solid rgba(238, 243, 228, 0.22);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+
+.coach b {
+  color: var(--gold);
+}
+
+
+/* ---------------------------------------------------------- commissions -- */
+
+/* An order is the morning's actual instruction, so it gets a card rather than a
+ * line in a list: a name, a number and a date, which is the shape of a plan. */
+.orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.orders .order {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255, 194, 74, 0.08);
+  border: 1px solid rgba(255, 194, 74, 0.28);
+}
+
+.orders .ico {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.orders .nm {
+  flex: 1;
+  min-width: 0;
+}
+
+.orders .nm b {
+  display: block;
+  font-size: 14px;
+}
+
+.orders .nm span {
+  display: block;
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.orders .nm span.cold {
+  color: var(--rust);
+}
+
+.orders .cost {
+  flex: none;
+  color: var(--leaf);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.order-news {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.45;
+}
+
+.order-news.is-good {
+  color: var(--leaf);
+  border-color: rgba(121, 196, 106, 0.35);
+}
+
+.order-news.is-bad {
+  color: var(--red);
+  border-color: rgba(255, 107, 91, 0.35);
+}
+
+.offer {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(121, 196, 106, 0.1);
+  border: 1px solid rgba(121, 196, 106, 0.32);
+}
+
+.offer-line {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
 }

@@ -332,6 +332,64 @@ and customers who think you are dear will haggle exactly once. Rent falls every 
 faster than standing still can pay for. The score on the board is what you took over the run; the
 `wave` column is the day you reached.
 
+### "So it is just go, collect and sell"
+
+That was a fair report of the first version, and it was structural rather than a
+matter of signposting. Measured over 200 simulated runs, buying upgrades in the
+order a player probably would:
+
+| unlock | median day |
+| --- | --- |
+| Workbench (crafting at all) | **4** |
+| Steel Axe (a third band) | 8 |
+| Lantern (a fourth) | 10 |
+
+So every decision beyond *which price* lived on the far side of three days of
+walking out, picking things up and selling them. Most people judge a game well
+before day four. Two changes:
+
+**Everyone has a bench from day one.** Three of the five recipes are open
+immediately; the 260-coin **Master Bench** now buys the good half of the recipe
+book (Flint Hatchet, Amber Charm) rather than the idea of crafting.
+
+**Commissions.** Each evening someone offers a standing order — a good, a
+number, a date three days out, paying about 85% over the market. Take it or
+leave it. An accepted order names the next morning's actual task, which is the
+difference between "gather things" and "three clay pots by Thursday". They are
+sized larger than one day's gathering on purpose, so taking one is a commitment
+rather than a bonus for what you happened to pick up.
+
+Getting them to work turned up a real bug that only the simulation could see:
+orders lapsed **5.5 times for every 4 filled**, because the shop was selling the
+very goods the commission was waiting for. The shelf stocks the most valuable
+goods first, and a commissioned good is by definition a valuable one. Two fixes —
+deliver *after* the bench rather than before it, so something made this afternoon
+can fill tonight's order; and hold back anything an outstanding order still needs
+from the shelves. It now runs 11.7 filled to 2.8 lapsed, and commissions are
+about a quarter of a careful player's income rather than a tax on attention.
+
+### Saying what the game is
+
+Two things the first players hit, both of them the game's fault rather than
+theirs. "I have no idea what to do, I only collect some stuff and nothing else"
+— the morning stated its goal nowhere on screen, so there was no way to learn
+that the point was to fill the satchel and walk back to the door. And "when I
+need to assign points I can assign limitless points" — the price stepper had no
+ceiling and no stated consequence, so holding + until a 10-coin resin cost 4,000
+looked exactly like pricing it fairly.
+
+So: the title screen lists the four parts of a day; the wood carries a standing
+objective line and a compass that always points at the door with the distance in
+paces; the first morning coaches in three steps and then never again; and the
+pricing row now carries a **three-segment outlook bar** — will buy, will haggle,
+will walk out — with a ceiling on the stepper.
+
+The bar is not a guess. `priceOutlook()` derives it from the very distribution
+`makeCustomer()` draws from: taste is uniform over [0.78, 1.32] and patience over
+[1.15, 1.4], so for any price the split is arithmetic. It agrees with the balance
+sim by construction, which is why the cliff the sweep found at ×1.3 is the same
+place the bar turns red.
+
 ### The economy is simulated, not tuned by feel
 
 `economy.js` and `world.js` are pure modules — no `window`, no `document`, and crucially no
