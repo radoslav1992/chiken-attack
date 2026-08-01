@@ -15,7 +15,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "tail": "wrangler tail",
     "icons": "node tools/make-icons.mjs && node tools/make-beaver-icons.mjs && node tools/make-orbit-icons.mjs && node tools/make-whittle-icons.mjs",
-    "brand": "node tools/make-brand-mark.mjs"
+    "brand": "node tools/make-brand-mark.mjs",
+    "smoke": "node tools/platform-smoke.mjs"
   },
   "devDependencies": {
     "astro": "^7.1.6",

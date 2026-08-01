@@ -12,68 +12,21 @@ const canvas = $('#game');
 const game = new Game(canvas);
 window.__game = game;
 
-/* ------------------------------------------------------------ persistence -- */
+/* --------------------------------------------- persistence and the board -- */
 
-const SAVE_KEY = 'whittle-wares.save';
-const BEST_KEY = 'whittle-wares.best';
-const NAME_KEY = 'whittle-wares.name';
+import { makeStore, cleanName } from '../../shared/store.js';
+import { makeScoreboard } from '../../shared/scores.js';
+import {
+  registerServiceWorker, bridgeArcadeSound, unlockOnFirstGesture, pauseOnHide,
+} from '../../shared/pwa.js';
 
-const store = {
-  get(k, fallback) {
-    try {
-      const v = localStorage.getItem(k);
-      return v == null ? fallback : JSON.parse(v);
-    } catch {
-      return fallback;
-    }
-  },
-  set(k, v) {
-    try {
-      localStorage.setItem(k, JSON.stringify(v));
-    } catch {}
-  },
-  del(k) {
-    try {
-      localStorage.removeItem(k);
-    } catch {}
-  },
-};
+const store = makeStore('whittle-wares');
+const board = makeScoreboard('whittle-wares');
 
 const traderName = {
-  get: () => store.get(NAME_KEY, 'TRADER'),
-  set: (v) => store.set(NAME_KEY, v),
+  get: () => store.get('name', 'TRADER'),
+  set: (v) => store.set('name', v),
 };
-
-/* ---------------------------------------------------------- global scores -- */
-
-let lastRun = null;
-
-function submitScore(result) {
-  if (result.score <= 0) return;
-  const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
-  lastRun = {
-    id,
-    game: 'whittle-wares',
-    score: Math.floor(result.score),
-    wave: result.day, // the day reached, same column as waves and metres
-    difficulty: 'veteran',
-  };
-  pushScore();
-}
-
-function pushScore() {
-  if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: traderName.get() }),
-  }).catch(() => {
-    /* offline — the local best still stands */
-  });
-}
 
 /* ----------------------------------------------------------------- screens -- */
 
@@ -543,18 +496,18 @@ $('#btn-sleep').addEventListener('click', () => {
   game.sleep();
 });
 
-game.on('save', () => store.set(SAVE_KEY, game.snapshot()));
+game.on('save', () => store.set('save', game.snapshot()));
 
 /* ------------------------------------------------------------------- over -- */
 
 let nameSaved = false;
 
 game.on('gameover', (r) => {
-  store.del(SAVE_KEY);
-  const best = store.get(BEST_KEY, { score: 0, day: 0 });
+  store.del('save');
+  const best = store.get('best', { score: 0, day: 0 });
   const isBest = r.score > best.score;
-  if (isBest) store.set(BEST_KEY, { score: r.score, day: r.day });
-  submitScore(r);
+  if (isBest) store.set('best', { score: r.score, day: r.day });
+  board.submit({ score: r.score, wave: r.day }, traderName.get());
   nameSaved = false;
   $('#name-input').value = traderName.get();
   $('#btn-save-name').textContent = 'Save';
@@ -564,7 +517,7 @@ game.on('gameover', (r) => {
   $('#over-score').textContent = r.score.toLocaleString('en-US');
   $('#over-days').textContent = `${r.day} of ${DAYS_TARGET}`;
   $('#over-sold').textContent = r.sold;
-  $('#over-best').textContent = store.get(BEST_KEY, { score: 0 }).score.toLocaleString('en-US');
+  $('#over-best').textContent = store.get('best', { score: 0 }).score.toLocaleString('en-US');
   showOnly('over');
 });
 
@@ -576,12 +529,12 @@ $('#name-input').addEventListener('blur', saveName);
 
 function saveName() {
   if (nameSaved) return;
-  const clean = $('#name-input').value.toUpperCase().replace(/[^A-Z0-9 .\-_]/g, '').trim().slice(0, 12);
+  const clean = cleanName($('#name-input').value, '');
   if (!clean) return;
   traderName.set(clean);
   nameSaved = true;
   $('#btn-save-name').textContent = 'Saved';
-  pushScore();
+  board.rename(clean);
   sfx.ui();
   setTimeout(() => {
     $('#btn-save-name').textContent = 'Save';
@@ -675,7 +628,7 @@ $('#btn-resume').addEventListener('click', () => togglePause());
 $('#btn-quit').addEventListener('click', () => {
   paused = false;
   game.stop();
-  store.del(SAVE_KEY);
+  store.del('save');
   game.phase = 'menu';
   showOnly('menu');
   refreshMenu();
@@ -695,7 +648,7 @@ $('#btn-quit').addEventListener('click', () => {
 $('#btn-start').addEventListener('click', () => {
   unlock();
   sfx.ui();
-  store.del(SAVE_KEY);
+  store.del('save');
   game.newRun();
 });
 
@@ -708,18 +661,18 @@ $('#btn-again').addEventListener('click', () => {
 $('#btn-continue').addEventListener('click', () => {
   unlock();
   sfx.ui();
-  const saved = store.get(SAVE_KEY, null);
+  const saved = store.get('save', null);
   if (!saved || !game.restore(saved)) game.newRun();
 });
 
 function refreshMenu() {
   // Nothing else on the menu said what a day consists of.
 
-  const best = store.get(BEST_KEY, { score: 0, day: 0 });
+  const best = store.get('best', { score: 0, day: 0 });
   $('#menu-best').textContent = best.score
     ? `Best: ${best.score.toLocaleString('en-US')} coin taken, day ${best.day}`
     : 'No shop yet';
-  const saved = store.get(SAVE_KEY, null);
+  const saved = store.get('save', null);
   show($('#btn-continue'), !!saved);
   if (saved) $('#btn-continue').textContent = `Continue — day ${saved.day}`;
 }
@@ -730,28 +683,16 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => game.resize(), 80);
 });
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && game.phase === 'forage' && !paused) togglePause();
+pauseOnHide(() => {
+  if (game.phase === 'forage' && !paused) togglePause();
 });
 
-/* The arcade game page's sound button reaches in here. */
-window.addEventListener('message', (e) => {
-  if (e.origin !== location.origin) return;
-  const msg = e.data;
-  if (!msg || msg.type !== 'arcade:set-sound') return;
-  setSound(!!msg.on);
+bridgeArcadeSound((on) => {
+  setSound(on);
   syncSoundButtons();
 });
-
-['pointerdown', 'keydown'].forEach((evt) =>
-  window.addEventListener(evt, () => unlock(), { once: true, passive: true })
-);
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
+unlockOnFirstGesture(unlock);
+registerServiceWorker();
 
 syncSoundButtons();
 refreshMenu();

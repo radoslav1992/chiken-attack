@@ -275,34 +275,25 @@ game.on('pause', (paused) => {
  * client-generated so saving a name after game over renames the same run.
  * Offline or API-less installs just skip it — the local table still works.
  */
-let lastRun = null;
+import { makeScoreboard } from '../../shared/scores.js';
+import {
+  registerServiceWorker, bridgeArcadeSound, pauseOnHide,
+} from '../../shared/pwa.js';
+
+const board = makeScoreboard('chicken-attack');
 
 function submitGlobalScore(result) {
-  if (result.score <= 0) return;
-  const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
-  lastRun = {
-    id,
-    game: 'chicken-attack',
-    score: Math.floor(result.score),
-    wave: result.wave,
-    difficulty: result.difficulty ? result.difficulty.id : 'veteran',
-  };
-  pushGlobalScore();
+  board.submit(
+    {
+      score: result.score,
+      wave: result.wave,
+      difficulty: result.difficulty ? result.difficulty.id : 'veteran',
+    },
+    lastName()
+  );
 }
 
-function pushGlobalScore() {
-  if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: lastName() }),
-  }).catch(() => {
-    /* offline or standalone install — local scores only */
-  });
-}
+const pushGlobalScore = () => board.rename(lastName());
 
 /* -------------------------------------------------------------- game over -- */
 
@@ -403,15 +394,13 @@ canvas.addEventListener('pointerdown', dismissHint, { passive: true });
  * When the game runs inside a game-page iframe, the page's sound button sends
  * this message. It flips both sound and music together.
  */
-window.addEventListener('message', (e) => {
-  if (e.origin !== location.origin) return;
-  const msg = e.data;
-  if (!msg || msg.type !== 'arcade:set-sound') return;
-  settings.set('sound', !!msg.on);
-  settings.set('music', !!msg.on);
+/* The arcade page's sound button reaches in here. */
+bridgeArcadeSound((on) => {
+  settings.set('sound', on);
+  settings.set('music', on);
   syncSettingsUi();
   syncMusicSetting(game.state !== 'attract' && game.state !== 'boot');
-  if (msg.on && game.player) music.start(game.wave && game.wave.isBoss ? 'boss' : 'space');
+  if (on && game.player) music.start(game.wave && game.wave.isBoss ? 'boss' : 'space');
 });
 
 /* --------------------------------------------------------------- lifecycle -- */
@@ -425,7 +414,7 @@ window.addEventListener('resize', resizeAll);
 window.addEventListener('orientationchange', () => setTimeout(resizeAll, 260));
 if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeAll);
 
-document.addEventListener('visibilitychange', () => {
+pauseOnHide(() => {
   if (document.hidden) {
     if (['playing', 'wave-intro', 'wave-clear', 'countdown'].includes(game.state)) {
       game.togglePause(true);
@@ -467,13 +456,7 @@ window.addEventListener('appinstalled', () => {
   installEvent = null;
 });
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {
-      /* offline support is a bonus, not a requirement */
-    });
-  });
-}
+registerServiceWorker();
 
 /* -------------------------------------------------------------------- boot -- */
 

@@ -1,102 +1,39 @@
 /*
- * Orbit Cadet service worker, scope /orbit-cadet/. Precaches the shell for
- * offline play; navigations, scripts and styles are network-first so an online
- * page always runs one deploy's worth of files. Only touches caches carrying
- * its own prefix — cache storage is shared across the whole origin.
+ * Orbit Cadet service worker, scope /orbit-cadet/.
+ *
+ * The body lives in /shared/sw-core.js — this file is the manifest of what to
+ * precache and nothing else. Version bumped when the shared core changed, so
+ * every installed copy replaces itself rather than running last deploy's worker
+ * against this deploy's files.
+ *
+ * The shared modules are precached by absolute path because they sit outside
+ * this scope. A service worker may cache anything same-origin; it just may not
+ * intercept requests outside its own scope, which is exactly the arrangement we
+ * want — one shared file, four independent caches.
  */
 
-const VERSION = 'orbit-cadet-v2';
-const SHELL = './';
+importScripts('/shared/sw-core.js');
 
-const ASSETS = [
-  SHELL,
-  'manifest.webmanifest',
-  'css/styles.css',
-  'js/main.js',
-  'js/game.js',
-  'js/physics.js',
-  'js/table.js',
-  'js/audio.js',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-maskable-512.png',
-  'icons/apple-touch-icon.png',
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(VERSION).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.filter((k) => k.startsWith('orbit-cadet-') && k !== VERSION).map((k) => caches.delete(k))
-        )
-      )
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  // Score submissions and board reads must never be answered from cache.
-  if (url.pathname.startsWith('/api/')) return;
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok && !res.redirected) {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(SHELL, copy));
-          }
-          return res;
-        })
-        .catch(async () => {
-          const root = new URL(SHELL, self.registration.scope);
-          if (url.pathname !== root.pathname) return Response.redirect(root.href, 302);
-          return (await caches.match(SHELL)) || Response.error();
-        })
-    );
-    return;
-  }
-
-  const critical = request.destination === 'script' || request.destination === 'style';
-  if (critical) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(request).then((r) => r || Response.error()))
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+self.arcadeServiceWorker({
+  version: 'orbit-cadet-v3',
+  shell: './',
+  assets: [
+    './',
+    'manifest.webmanifest',
+    'css/styles.css',
+    'js/main.js',
+    'js/game.js',
+    'js/physics.js',
+    'js/table.js',
+    'js/audio.js',
+    'icons/icon-192.png',
+    'icons/icon-512.png',
+    'icons/icon-maskable-512.png',
+    'icons/apple-touch-icon.png',
+    '/shared/store.js',
+    '/shared/scores.js',
+    '/shared/pwa.js',
+    '/shared/viewport.js',
+    '/shared/audio-engine.js',
+  ],
 });

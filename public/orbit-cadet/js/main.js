@@ -11,68 +11,30 @@ window.__game = game;
 
 /* ------------------------------------------------------------- persistence -- */
 
-const BEST_KEY = 'orbit-cadet.best';
-const NAME_KEY = 'orbit-cadet.name';
+import { makeStore, cleanName } from '../../shared/store.js';
+import { makeScoreboard } from '../../shared/scores.js';
+import {
+  registerServiceWorker, bridgeArcadeSound, unlockOnFirstGesture, pauseOnHide,
+} from '../../shared/pwa.js';
+
+const store = makeStore('orbit-cadet');
+const board = makeScoreboard('orbit-cadet');
 
 const best = {
-  get() {
-    try {
-      return JSON.parse(localStorage.getItem(BEST_KEY)) || { score: 0, rank: 'Cadet' };
-    } catch {
-      return { score: 0, rank: 'Cadet' };
-    }
-  },
-  set(v) {
-    try {
-      localStorage.setItem(BEST_KEY, JSON.stringify(v));
-    } catch {}
-  },
+  get: () => store.get('best', { score: 0, rank: 'Cadet' }),
+  set: (v) => store.set('best', v),
 };
 
 const pilotName = {
-  get() {
-    try {
-      return localStorage.getItem(NAME_KEY) || 'CADET';
-    } catch {
-      return 'CADET';
-    }
-  },
-  set(v) {
-    try {
-      localStorage.setItem(NAME_KEY, v);
-    } catch {}
-  },
+  get: () => store.get('name', 'CADET'),
+  set: (v) => store.set('name', v),
 };
 
 /* ---------------------------------------------------------- global scores -- */
 
-let lastRun = null;
-
 function submitGlobalScore(result) {
-  if (result.score <= 0) return;
-  const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
-  lastRun = {
-    id,
-    game: 'orbit-cadet',
-    score: Math.floor(result.score),
-    wave: result.rankIdx + 1, // rank reached, the same column waves and metres use
-    difficulty: 'veteran',
-  };
-  pushGlobalScore();
-}
-
-function pushGlobalScore() {
-  if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: pilotName.get() }),
-  }).catch(() => {
-    /* offline — the local best still works */
-  });
+  // `wave` is whatever second number a game ranks by: here, the rank reached.
+  board.submit({ score: result.score, wave: result.rankIdx + 1 }, pilotName.get());
 }
 
 /* ---------------------------------------------------------------- screens -- */
@@ -162,12 +124,12 @@ $('#name-input').addEventListener('blur', saveName);
 
 function saveName() {
   if (nameSaved) return;
-  const clean = $('#name-input').value.toUpperCase().replace(/[^A-Z0-9 .\-_]/g, '').trim().slice(0, 12);
+  const clean = cleanName($('#name-input').value, '');
   if (!clean) return;
   pilotName.set(clean);
   nameSaved = true;
   $('#btn-save-name').textContent = 'Saved';
-  pushGlobalScore();
+  board.rename(pilotName.get());
   sfx.ui();
   setTimeout(() => {
     $('#btn-save-name').textContent = 'Save';
@@ -352,7 +314,7 @@ window.addEventListener('resize', () => {
 });
 
 // Losing focus mid-ball would strand the game; pause instead.
-document.addEventListener('visibilitychange', () => {
+pauseOnHide(() => {
   if (document.hidden) game.pause();
 });
 window.addEventListener('blur', () => {
@@ -363,23 +325,14 @@ window.addEventListener('blur', () => {
 });
 
 /* The arcade game page's sound button reaches in here. */
-window.addEventListener('message', (e) => {
-  if (e.origin !== location.origin) return;
-  const msg = e.data;
-  if (!msg || msg.type !== 'arcade:set-sound') return;
-  setSound(!!msg.on);
+bridgeArcadeSound((on) => {
+  setSound(on);
   syncSoundButtons();
 });
 
-['pointerdown', 'keydown'].forEach((evt) =>
-  window.addEventListener(evt, () => unlock(), { once: true, passive: true })
-);
+unlockOnFirstGesture(unlock);
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
+registerServiceWorker();
 
 /* -------------------------------------------------------------------- boot -- */
 

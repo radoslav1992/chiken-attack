@@ -27,6 +27,35 @@ Three cabinets are open:
 All four are fully playable offline and every pixel and sound in them is generated procedurally at
 runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
 
+## The shared platform
+
+`public/shared/` holds what all four games were each implementing separately:
+the save wrapper, the leaderboard client, the service worker, the DPR canvas fit,
+the audio context and the bridge to the arcade page. See
+[`public/shared/README.md`](public/shared/README.md) for the module list.
+
+The line count is not the point — a new game used to start at zero and had to
+re-earn a PWA, a service worker, a save system and a leaderboard **before it was
+a game at all.** That was most of a session, every time.
+
+Two things the extraction turned up that are worth keeping in mind:
+
+**The four audio modules exported the same names and were not the same thing.**
+Beaver Dash's `noise()` takes `{dur, vol, freq, freq2}` and sweeps a filter;
+Orbit Cadet's takes `{vol, freq, freq2, type, q}` and is a bandpass. Swapping
+either for the shared `{dur, gain, hp}` compiles, boots, throws no errors, and
+silently ruins every sound in the game. So only the plumbing is shared — context,
+master gain, mute preference, unlock — and any game whose synthesis differs keeps
+its own. The rule in `public/shared/README.md` is the test: *would changing this
+for one game be a bug for the other three?*
+
+**The service worker is the dangerous one.** `sw-core.js` is loaded by every
+installed worker on the origin, so a mistake in it is four games serving stale
+files to everyone who ever installed them. The caching logic was moved across
+unchanged — verified by diffing the old handler bodies against the new one with
+comments and indentation stripped, which came back identical — and every game's
+cache version was bumped so installed copies replace themselves.
+
 ## Stack
 
 - **Astro** (static output) for the landing page, game pages and 404 — built to `dist/`.
@@ -102,6 +131,7 @@ migrations/                 D1 schema
 public/
   chicken-attack/           game — self-contained PWA, unchanged by the site build
   beaver-dash/              game — same shape, own service worker + icons
+  shared/                   the platform: store, scores, pwa, viewport, audio, sw-core
   orbit-cadet/              game — pinball; physics.js and table.js are pure modules
   whittle-wares/            game — shopkeeper RPG; economy.js and world.js are pure modules
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
