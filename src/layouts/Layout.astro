@@ -1,12 +1,58 @@
 ---
 import '../styles/global.css';
+import { SITE, jsonLd } from '../data/site.js';
 
 interface Props {
   title: string;
   description?: string;
+  /** Social share image, site-relative (e.g. a game's stage art). */
+  image?: string;
+  imageAlt?: string;
+  /** Extra JSON-LD nodes merged into the page's @graph. */
+  schema?: object[];
+  /** Set on pages that should stay out of search indexes (404). */
+  noindex?: boolean;
 }
 
-const { title, description = 'Hand-picked browser games that load in under a second. No installs, no ads, playable offline.' } = Astro.props;
+const {
+  title,
+  description = SITE.description,
+  image = SITE.ogImage,
+  imageAlt = SITE.ogImageAlt,
+  schema = [],
+  noindex = false,
+} = Astro.props;
+
+// Absolute canonical URL. The Worker serves directories with a trailing slash
+// (html_handling: auto-trailing-slash), so normalise to that form.
+const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonical = new URL(path, Astro.site).href;
+const imageUrl = new URL(image, Astro.site).href;
+
+// Every page carries the site-wide WebSite + Organization nodes; pages append
+// their own (VideoGame, FAQPage, BreadcrumbList, …) via the schema prop.
+const graph = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': new URL('/#website', Astro.site).href,
+      url: new URL('/', Astro.site).href,
+      name: SITE.name,
+      description: SITE.description,
+      inLanguage: SITE.locale,
+      publisher: { '@id': new URL('/#organization', Astro.site).href },
+    },
+    {
+      '@type': 'Organization',
+      '@id': new URL('/#organization', Astro.site).href,
+      name: SITE.author,
+      url: new URL('/', Astro.site).href,
+      logo: new URL(SITE.ogImage, Astro.site).href,
+    },
+    ...schema,
+  ],
+};
 ---
 
 <!doctype html>
@@ -16,8 +62,30 @@ const { title, description = 'Hand-picked browser games that load in under a sec
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="author" content={SITE.author} />
+    <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'} />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonical} />
     <meta name="theme-color" content="#12101c" />
     <link rel="icon" href="/chicken-attack/icons/icon-192.png" sizes="192x192" />
+
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+
+    {/* JSON-LD is a data block, never executed, so the strict CSP ignores it. */}
+    <script type="application/ld+json" set:html={jsonLd(graph)} />
   </head>
   <body>
     <slot />

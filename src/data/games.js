@@ -24,7 +24,7 @@ export const GAMES = [
       'Nine weapons with ten power levels each, timed power-ups from wing drones to a screen-clearing pressure cooker, and a boss every fifth wave: a crowned giant hen and a chicken mothership take turns. Runs autosave between waves, so closing the tab only pauses the fight.',
     ],
     stats: { rating: '—', size: '0.4 MB', runTime: '~5 min', players: '1' },
-    meta: { developer: 'The Coop', released: 'Jul 2026', genreLine: 'Shooter · Waves' },
+    meta: { developer: 'The Coop', released: 'Jul 2026', releasedISO: '2026-07', genreLine: 'Shooter · Waves' },
     capabilities: ['Touch', 'Keyboard', 'Gamepad', 'Offline', 'No ads'],
     controls: [
       { key: 'DRAG', desc: 'Fly — the ship follows your finger' },
@@ -56,7 +56,7 @@ export const GAMES = [
       'Every obstacle asks something different of the one button. A stump wants a tap. A log raft wants a full held jump. The river wants distance, not height. The dam is taller than one jump can reach. And the heron flies at exactly hop height, so the only answer to it is to press nothing at all. A third press in the air is a tail-slam that smashes stumps and rocks for points — but it spends your descent, so dive early and you land with nothing left.',
     ],
     stats: { rating: '—', size: '0.1 MB', runTime: '~3 min', players: '1' },
-    meta: { developer: 'The Coop', released: 'Jul 2026', genreLine: 'Runner · Endless' },
+    meta: { developer: 'The Coop', released: 'Jul 2026', releasedISO: '2026-07', genreLine: 'Runner · Endless' },
     capabilities: ['Touch', 'Keyboard', 'Offline', 'No ads'],
     controls: [
       { key: 'TAP', desc: 'A short hop — enough for a stump' },
@@ -88,7 +88,7 @@ export const GAMES = [
       'The left half of the screen is the left flipper and the right half is the right, so a phone held upright is the whole controller. Hold low to charge the plunger. And you can shove the table when a shot is going wrong: three shoves and it tilts, which kills the flippers and hands the ball to gravity.',
     ],
     stats: { rating: '—', size: '0.2 MB', runTime: '~4 min', players: '1' },
-    meta: { developer: 'The Coop', released: 'Jul 2026', genreLine: 'Pinball · Missions' },
+    meta: { developer: 'The Coop', released: 'Jul 2026', releasedISO: '2026-07', genreLine: 'Pinball · Missions' },
     capabilities: ['Touch', 'Keyboard', 'Offline', 'No ads'],
     controls: [
       { key: 'TAP L', desc: 'Left flipper — the whole left half of the screen' },
@@ -120,7 +120,7 @@ export const GAMES = [
       'Every evening you price what is on the shelf and open up. Two goods are wanted each day and one is glutted, so the right price changes with the morning. Customers who think you are dear will haggle once — take their offer or hold firm and risk the sale. Word gets around either way. Rent falls on every fifth day and grows faster than standing still can pay for.',
     ],
     stats: { rating: '—', size: '0.1 MB', runTime: '~15 min', players: '1' },
-    meta: { developer: 'The Coop', released: 'Jul 2026', genreLine: 'RPG · Tycoon' },
+    meta: { developer: 'The Coop', released: 'Jul 2026', releasedISO: '2026-07', genreLine: 'RPG · Tycoon' },
     capabilities: ['Touch', 'Keyboard', 'Offline', 'Saves', 'No ads'],
     controls: [
       { key: 'DRAG', desc: 'Walk — drag anywhere in the wood' },

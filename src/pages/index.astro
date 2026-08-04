@@ -4,15 +4,59 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Leaderboard from '../components/Leaderboard.astro';
 import { GAMES, PLAYABLE } from '../data/games.js';
+import { FAQ } from '../data/faq.js';
+import { SITE } from '../data/site.js';
 
 const featured = PLAYABLE[0];
 const genres = ['All', ...new Set(GAMES.map((g) => g.genre))];
 const tickerItems = ['INSTANT PLAY', 'NO SIGN-UP', 'NO ADS', 'WORKS OFFLINE', 'FREE FOREVER', 'NEW CABINETS COMING'];
+
+const orgId = new URL('/#organization', Astro.site).href;
+const schema = [
+  {
+    '@type': 'ItemList',
+    name: `${SITE.name} arcade`,
+    itemListElement: PLAYABLE.map((g, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'VideoGame',
+        name: g.title,
+        url: new URL(`/games/${g.slug}/`, Astro.site).href,
+        image: new URL(g.art, Astro.site).href,
+        description: g.blurb,
+        genre: g.genre,
+        gamePlatform: 'Web browser',
+        operatingSystem: 'Any',
+        playMode: 'SinglePlayer',
+        applicationCategory: 'Game',
+        datePublished: g.meta.releasedISO,
+        author: { '@id': orgId },
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+      },
+    })),
+  },
+  {
+    '@type': 'FAQPage',
+    mainEntity: FAQ.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  },
+];
 ---
 
-<Layout title="Beaver Games — no downloads, just press start">
+<Layout
+  title="Beaver Games — no downloads, just press start"
+  image={featured.stageArt}
+  imageAlt={`${featured.title} gameplay`}
+  schema={schema}
+>
   <div id="top"></div>
   <Header variant="landing" />
+
+  <main>
 
   <section class="hero">
     <div class="hero-glow"></div>
@@ -245,6 +289,28 @@ const tickerItems = ['INSTANT PLAY', 'NO SIGN-UP', 'NO ADS', 'WORKS OFFLINE', 'F
     </div>
   </section>
 
+  <section id="faq" class="wrap section">
+    <div class="kicker-row">
+      <span class="kicker is-teal">STRAIGHT ANSWERS</span>
+      <span class="kicker-rule"></span>
+    </div>
+    <h2 class="h2">QUESTIONS, ANSWERED</h2>
+    <p class="faq-sub">The short version: it's free, it's instant, and it works offline. The long version:</p>
+    <div class="faq-list">
+      {
+        FAQ.map((item) => (
+          <details class="faq-item">
+            <summary class="faq-q">
+              <h3>{item.q}</h3>
+              <span class="faq-toggle" aria-hidden="true">+</span>
+            </summary>
+            <p class="faq-a">{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+
   <section id="signup" class="signup">
     <div class="signup-inner">
       <span class="kicker is-red">NEW CABINET WHEN IT'S READY</span>
@@ -270,6 +336,7 @@ const tickerItems = ['INSTANT PLAY', 'NO SIGN-UP', 'NO ADS', 'WORKS OFFLINE', 'F
       <p class="signup-note" data-signup-note></p>
     </div>
   </section>
+  </main>
 
   <Footer variant="landing" />
 </Layout>

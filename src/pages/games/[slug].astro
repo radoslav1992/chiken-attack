@@ -4,6 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import Leaderboard from '../../components/Leaderboard.astro';
 import { GAMES, PLAYABLE } from '../../data/games.js';
+import { SITE } from '../../data/site.js';
 
 export function getStaticPaths() {
   return PLAYABLE.map((game) => ({ params: { slug: game.slug }, props: { game } }));
@@ -11,22 +12,60 @@ export function getStaticPaths() {
 
 const { game } = Astro.props;
 const related = GAMES.filter((g) => g.slug !== game.slug);
+
+const orgId = new URL('/#organization', Astro.site).href;
+const pageUrl = new URL(`/games/${game.slug}/`, Astro.site).href;
+const schema = [
+  {
+    '@type': 'VideoGame',
+    '@id': `${pageUrl}#game`,
+    name: game.title,
+    url: pageUrl,
+    image: new URL(game.stageArt, Astro.site).href,
+    description: [game.blurb, ...game.about].join(' '),
+    genre: game.genre,
+    gamePlatform: 'Web browser',
+    operatingSystem: 'Any',
+    playMode: 'SinglePlayer',
+    applicationCategory: 'Game',
+    numberOfPlayers: game.stats.players,
+    datePublished: game.meta.releasedISO,
+    dateModified: SITE.updated,
+    author: { '@id': orgId },
+    publisher: { '@id': orgId },
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Arcade', item: new URL('/', Astro.site).href },
+      { '@type': 'ListItem', position: 2, name: game.title, item: pageUrl },
+    ],
+  },
+];
 ---
 
-<Layout title={`${game.title} — play free on Beaver Games`} description={game.blurb}>
+<Layout
+  title={`${game.title} — play free on Beaver Games`}
+  description={game.blurb}
+  image={game.stageArt}
+  imageAlt={`${game.title} title screen`}
+  schema={schema}
+>
   <Header variant="game" />
 
-  <div class="wrap breadcrumb">
+  <main>
+  <nav class="wrap breadcrumb" aria-label="Breadcrumb">
     <a href="/">Arcade</a> / {game.genre} / <span class="breadcrumb-here">{game.title}</span>
-  </div>
+  </nav>
 
   <section class="wrap game-layout">
-    <div>
+    <article>
       <div class="stage" data-stage data-play-path={game.playPath} data-title={game.title}>
         <img class="stage-art" src={game.stageArt} alt={`${game.title} title screen`} />
         <div class="stage-overlay" data-stage-overlay>
           <div class="stage-overlay-inner">
-            <div class="stage-title">{game.title.toUpperCase()}</div>
+            <h1 class="stage-title">{game.title.toUpperCase()}</h1>
             <div class="stage-sub">{game.tagline.toUpperCase()}</div>
             <button type="button" class="btn-pixel stage-start" data-start>▶ START GAME</button>
             <div class="stage-status" data-stage-status>Loads in about a second. No install.</div>
@@ -74,7 +113,7 @@ const related = GAMES.filter((g) => g.slug !== game.slug);
           </div>
         </div>
       </div>
-    </div>
+    </article>
 
     <aside class="game-aside">
       <div class="info-card">
@@ -153,6 +192,7 @@ const related = GAMES.filter((g) => g.slug !== game.slug);
       </div>
     </div>
   </section>
+  </main>
 
   <Footer variant="game" />
 </Layout>
