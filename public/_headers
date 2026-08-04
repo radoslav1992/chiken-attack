@@ -21,6 +21,16 @@
 /media/*
   Cache-Control: public, max-age=604800
 
+# Crawler-facing files: cacheable, but short enough that edits land same-day.
+/robots.txt
+  Cache-Control: public, max-age=3600
+
+/llms.txt
+  Cache-Control: public, max-age=3600
+
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+
 # Service workers must never be cached, or updates can never land. The root
 # one is the self-destruct stub for older installs.
 /sw.js

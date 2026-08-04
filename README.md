@@ -66,6 +66,32 @@ After that, `npm run deploy` is the whole release. CI (`.github/workflows/deploy
 does the same on pushes to `main` once `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets
 exist — it also applies pending D1 migrations before deploying.
 
+## SEO, GEO & AI crawlers
+
+The layout (`src/layouts/Layout.astro`) emits the full head set on every page: canonical URL,
+`meta robots`/`author`, Open Graph + Twitter cards, and JSON-LD structured data
+(`WebSite`/`Organization` site-wide, `VideoGame` + `BreadcrumbList` on game pages,
+`ItemList` + `FAQPage` on the landing page — the FAQ section and its JSON-LD both render from
+`src/data/faq.js`, so they cannot drift apart). The strict CSP does not block the inline JSON-LD:
+it is a data block, never executed, so `script-src` does not apply.
+
+Three crawler-facing files are **generated at build time** so their absolute URLs always match
+the configured origin: `/robots.txt` (allows all crawlers, AI bots explicitly by name, links the
+sitemap), `/llms.txt` (the [llms.txt](https://llmstxt.org/) manifest for AI assistants, built
+from `games.js` + `faq.js`), and `/sitemap.xml` (from the playable games list). They live in
+`src/pages/*.txt.js` / `*.xml.js`, not `public/`.
+
+Two knobs to know about:
+
+- **Canonical origin** — set in `astro.config.mjs` (`site`), overridable with a `SITE_URL` env
+  var at build time. **Update the fallback when the site gets its real domain**; canonical, OG
+  and sitemap URLs all derive from it. `SITE.updated` in `src/data/site.js` feeds
+  `dateModified`/`lastmod` — bump it when content meaningfully changes.
+- **Cloudflare can override robots.txt at the edge.** If the dashboard's AI-bot controls are on
+  (Security → Bots → "Block AI bots", or the managed-robots.txt "Content Signals" feature), AI
+  crawlers stay blocked no matter what this repo serves. To be visible to ChatGPT, Claude,
+  Perplexity and AI Overviews, set that to allow (at minimum for search/assistant bots).
+
 ## API
 
 | Route | Method | Purpose |
