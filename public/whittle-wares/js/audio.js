@@ -1,82 +1,17 @@
 /*
- * Whittle & Wares — sound, synthesised.
+ * Whittle & Wares — the sounds this game makes.
  *
- * No audio files: every sound is a few oscillators and an envelope. A shop game
- * makes a lot of small confirmations — a coin, a gather, a page turn — and those
- * want to be short, quiet and different enough from each other to be told apart
- * without looking.
+ * The synthesiser itself lives in /shared/audio-engine.js. What is left here is
+ * the part that is this game's character: which frequencies make a gather sound
+ * like picking something up rather than like a coin.
  */
 
-let ctx = null;
-let master = null;
-let on = true;
+import { tone, noise } from '../../shared/audio-engine.js';
+import { configureAudio, unlock, setSound, soundOn } from '../../shared/audio-engine.js';
 
-const KEY = 'whittle-wares.sound';
+configureAudio({ namespace: 'whittle-wares' });
 
-try {
-  on = localStorage.getItem(KEY) !== 'off';
-} catch {
-  /* private mode: default to on */
-}
-
-export function soundOn() {
-  return on;
-}
-
-export function setSound(v) {
-  on = !!v;
-  try {
-    localStorage.setItem(KEY, on ? 'on' : 'off');
-  } catch {}
-  if (master) master.gain.value = on ? 0.5 : 0;
-}
-
-export function unlock() {
-  if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
-    return;
-  }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  ctx = new AC();
-  master = ctx.createGain();
-  master.gain.value = on ? 0.5 : 0;
-  master.connect(ctx.destination);
-}
-
-function tone({ type = 'sine', from, to, dur = 0.12, gain = 0.2, delay = 0 }) {
-  if (!ctx || !on) return;
-  const t0 = ctx.currentTime + delay;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(from, t0);
-  if (to && to !== from) osc.frequency.exponentialRampToValueAtTime(Math.max(1, to), t0 + dur);
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.008);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  osc.connect(g).connect(master);
-  osc.start(t0);
-  osc.stop(t0 + dur + 0.02);
-}
-
-function noise({ dur = 0.12, gain = 0.14, delay = 0, hp = 400 }) {
-  if (!ctx || !on) return;
-  const t0 = ctx.currentTime + delay;
-  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  const filt = ctx.createBiquadFilter();
-  filt.type = 'highpass';
-  filt.frequency.value = hp;
-  const g = ctx.createGain();
-  g.gain.value = gain;
-  src.connect(filt).connect(g).connect(master);
-  src.start(t0);
-}
+export { unlock, setSound, soundOn };
 
 export const sfx = {
   step() {

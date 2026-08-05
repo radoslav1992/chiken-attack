@@ -11,85 +11,42 @@ window.__game = game;
 
 /* ------------------------------------------------------------- persistence -- */
 
-const BEST_KEY = 'beaver-dash.best';
-const NAME_KEY = 'beaver-dash.name';
-const SEEN_KEY = 'beaver-dash.seen';
+import { makeStore, cleanName } from '../../shared/store.js';
+import { makeScoreboard } from '../../shared/scores.js';
+import {
+  registerServiceWorker, bridgeArcadeSound, unlockOnFirstGesture, pauseOnHide,
+} from '../../shared/pwa.js';
+
+const store = makeStore('beaver-dash');
+const board = makeScoreboard('beaver-dash');
 
 const best = {
-  get() {
-    try {
-      return JSON.parse(localStorage.getItem(BEST_KEY)) || { score: 0, distance: 0 };
-    } catch {
-      return { score: 0, distance: 0 };
-    }
-  },
-  set(v) {
-    try {
-      localStorage.setItem(BEST_KEY, JSON.stringify(v));
-    } catch {}
-  },
+  get: () => store.get('best', { score: 0, distance: 0 }),
+  set: (v) => store.set('best', v),
 };
 
 const pilotName = {
-  get() {
-    try {
-      return localStorage.getItem(NAME_KEY) || 'BEAVER';
-    } catch {
-      return 'BEAVER';
-    }
-  },
-  set(v) {
-    try {
-      localStorage.setItem(NAME_KEY, v);
-    } catch {}
-  },
+  get: () => store.get('name', 'BEAVER'),
+  set: (v) => store.set('name', v),
 };
 
 /** Runs finished, used to retire the coaching lines. */
 const seen = {
   get() {
-    try {
-      return Number(localStorage.getItem(SEEN_KEY)) || 0;
-    } catch {
-      return 0;
-    }
+    return Number(store.get('seen', 0)) || 0;
   },
   bump() {
-    try {
-      localStorage.setItem(SEEN_KEY, String(this.get() + 1));
-    } catch {}
+    store.set('seen', this.get() + 1);
   },
 };
 
 /* ---------------------------------------------------------- global scores -- */
 
-let lastRun = null;
-
 function submitGlobalScore(result) {
-  if (result.score <= 0) return;
-  const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
-  lastRun = {
-    id,
-    game: 'beaver-dash',
-    score: Math.floor(result.score),
-    wave: Math.floor(result.distance), // metres, stored in the wave column
-    difficulty: 'veteran',
-  };
-  pushGlobalScore();
-}
-
-function pushGlobalScore() {
-  if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: pilotName.get() }),
-  }).catch(() => {
-    /* offline or standalone install — local best still works */
-  });
+  board.submit(
+    { score: result.score, wave: Math.round(result.distance || 0), difficulty: result.difficulty },
+    pilotName.get()
+  );
 }
 
 /* ---------------------------------------------------------------- screens -- */
@@ -178,12 +135,12 @@ $('#name-input').addEventListener('blur', saveName);
 
 function saveName() {
   if (nameSaved) return;
-  const clean = $('#name-input').value.toUpperCase().replace(/[^A-Z0-9 .\-_]/g, '').trim().slice(0, 12);
+  const clean = cleanName($('#name-input').value, '');
   if (!clean) return;
   pilotName.set(clean);
   nameSaved = true;
   $('#btn-save-name').textContent = 'Saved';
-  pushGlobalScore();
+  board.rename(pilotName.get());
   sfx.ui();
   setTimeout(() => {
     $('#btn-save-name').textContent = 'Save';
@@ -352,17 +309,14 @@ window.addEventListener('resize', () => {
 });
 
 // Losing focus mid-jump would otherwise strand the run: pause instead.
-document.addEventListener('visibilitychange', () => {
+pauseOnHide(() => {
   if (document.hidden) game.pause();
 });
 window.addEventListener('blur', () => game.pause());
 
 /* The arcade game page's sound button reaches in here. */
-window.addEventListener('message', (e) => {
-  if (e.origin !== location.origin) return;
-  const msg = e.data;
-  if (!msg || msg.type !== 'arcade:set-sound') return;
-  setSound(!!msg.on);
+bridgeArcadeSound((on) => {
+  setSound(on);
   syncSoundButtons();
 });
 
@@ -370,11 +324,7 @@ window.addEventListener('message', (e) => {
   window.addEventListener(evt, () => unlock(), { once: true, passive: true })
 );
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
+registerServiceWorker();
 
 /* -------------------------------------------------------------------- boot -- */
 
