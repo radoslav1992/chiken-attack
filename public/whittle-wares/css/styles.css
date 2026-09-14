@@ -25,7 +25,7 @@
   --red: #ff6b5b;
   --line: rgba(238, 243, 228, 0.14);
   --radius: 14px;
-  --font: ui-rounded, "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --font: ui-rounded, 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
 }
 
 * {
@@ -420,23 +420,23 @@ body {
   color: var(--dim);
 }
 
-.verdict[data-tone="cheap"] {
+.verdict[data-tone='cheap'] {
   color: #8fd0ff;
 }
 
-.verdict[data-tone="good"] {
+.verdict[data-tone='good'] {
   color: var(--leaf);
 }
 
-.verdict[data-tone="fair"] {
+.verdict[data-tone='fair'] {
   color: var(--gold);
 }
 
-.verdict[data-tone="dear"] {
+.verdict[data-tone='dear'] {
   color: var(--rust);
 }
 
-.verdict[data-tone="bad"] {
+.verdict[data-tone='bad'] {
   color: var(--red);
 }
 
@@ -798,7 +798,7 @@ body {
 }
 
 /* A woodland ledger: warm paper, ink, moss and brass. */
-body[data-arcade="whittle-wares"] .panel {
+body[data-arcade='whittle-wares'] .panel {
   --ink: #302b22;
   --dim: #70634f;
   --line: #6c513b30;
@@ -815,13 +815,13 @@ body[data-arcade="whittle-wares"] .panel {
     0 24px 80px #0008 !important;
   padding: 24px;
 }
-body[data-arcade="whittle-wares"] .panel-title {
+body[data-arcade='whittle-wares'] .panel-title {
   background:
     radial-gradient(ellipse at top, #fff8e6, transparent 65%),
     linear-gradient(135deg, #f5edd9, #e7dbc0) !important;
 }
-body[data-arcade="whittle-wares"] .title {
-  font-family: Georgia, "Times New Roman", serif;
+body[data-arcade='whittle-wares'] .title {
+  font-family: Georgia, 'Times New Roman', serif;
   font-weight: 700;
   font-size: clamp(32px, 7vw, 54px);
   letter-spacing: -0.055em;
@@ -848,62 +848,64 @@ body[data-arcade="whittle-wares"] .title {
   font-size: 11px;
   color: #6b553c;
 }
-body[data-arcade="whittle-wares"] .btn-primary {
+body[data-arcade='whittle-wares'] .btn-primary {
   background: #28583f !important;
   border-color: #28583f !important;
   color: #fff7e4 !important;
 }
-body[data-arcade="whittle-wares"] .btn-ghost {
+body[data-arcade='whittle-wares'] .btn-ghost {
   color: #51402d;
   border-color: #90764f55;
   background: #fffaf04d;
 }
-body[data-arcade="whittle-wares"] .mini {
+body[data-arcade='whittle-wares'] .mini {
   background: #fffcf080;
   color: #3f5638;
   border-color: #89755566;
   min-height: 40px;
 }
-body[data-arcade="whittle-wares"] .mini:disabled {
+body[data-arcade='whittle-wares'] .mini:disabled {
   opacity: 0.45;
 }
-body[data-arcade="whittle-wares"] .list li {
+body[data-arcade='whittle-wares'] .list li {
+  background: #fff9e980;
   border-color: #927b5140;
 }
-body[data-arcade="whittle-wares"] .list li.is-owned {
-  opacity: 0.6;
+body[data-arcade='whittle-wares'] .list li.is-owned {
+  opacity: 1;
+  background: #e2d7bc;
 }
-body[data-arcade="whittle-wares"] .panel-h,
+body[data-arcade='whittle-wares'] .panel-h,
 .journal-heading {
   font-family: Georgia, serif;
   letter-spacing: -0.02em;
   font-size: 25px;
   text-transform: none;
 }
-body[data-arcade="whittle-wares"] .hot,
-body[data-arcade="whittle-wares"] .is-good {
+body[data-arcade='whittle-wares'] .hot,
+body[data-arcade='whittle-wares'] .is-good {
   color: #2d6543;
 }
-body[data-arcade="whittle-wares"] .cold,
-body[data-arcade="whittle-wares"] .is-bad {
+body[data-arcade='whittle-wares'] .cold,
+body[data-arcade='whittle-wares'] .is-bad {
   color: #9e382b;
 }
-body[data-arcade="whittle-wares"] .offer {
+body[data-arcade='whittle-wares'] .offer {
   background: #b4c39d40;
   border-color: #72936866;
 }
-body[data-arcade="whittle-wares"] .rent {
+body[data-arcade='whittle-wares'] .rent {
   background: #dfb46c35;
   border: 1px solid #ae7a3755;
   padding: 12px;
   border-radius: 8px;
 }
-body[data-arcade="whittle-wares"] .arcade-result-summary,
-body[data-arcade="whittle-wares"] .arcade-score-status,
-body[data-arcade="whittle-wares"] .arcade-share-status {
+body[data-arcade='whittle-wares'] .arcade-result-summary,
+body[data-arcade='whittle-wares'] .arcade-score-status,
+body[data-arcade='whittle-wares'] .arcade-share-status {
   color: #63543d;
 }
-body[data-arcade="whittle-wares"] .name-input {
+body[data-arcade='whittle-wares'] .name-input {
   background: #fff8e9;
   color: #302b22;
   border-color: #967c53;
@@ -1042,12 +1044,12 @@ button.obj-home {
   z-index: 100;
   font: 13px/1.4 system-ui;
 }
-body[data-arcade="whittle-wares"] :focus-visible {
+body[data-arcade='whittle-wares'] :focus-visible {
   outline: 3px solid #a96827;
   outline-offset: 3px;
 }
 @media (max-width: 440px) {
-  body[data-arcade="whittle-wares"] .panel {
+  body[data-arcade='whittle-wares'] .panel {
     padding: 18px 14px;
   }
   .screen {

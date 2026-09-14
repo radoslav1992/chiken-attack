@@ -888,6 +888,10 @@ function togglePause() {
   show(SCREENS.pause, paused);
   show(hudEl, !paused);
   if (paused) {
+    show(objEl, false);
+    show(coachEl, false);
+  } else renderObjective();
+  if (paused) {
     renderJournal($('#pause-journal'));
     saveGame();
     for (const key of ['left', 'right', 'up', 'down']) game.key(key, false);
