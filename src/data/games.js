@@ -81,8 +81,8 @@ export const GAMES = [
     art: '/media/orbit-cadet-card.png',
     stageArt: '/media/orbit-cadet-stage.png',
     icon: '/orbit-cadet/icons/icon-192.png',
-    tagline: 'Pinball · v1',
-    blurb: 'A table with a rank to climb. Two thumbs, two flippers, seven promotions.',
+    tagline: 'Classic space pinball · v2',
+    blurb: 'Classic space pinball: chrome rails, glowing bumpers, mission lights, and seven ranks to climb.',
     about: [
       'A pinball table where the point is not the score but the promotion. Roll over the mission target to arm one — clear the drop-target bank, sweep the beacons, run the orbit, work the spinner — and each one you finish moves you up a rank, from Cadet all the way to Admiral. The rank you reach is what goes on the board next to your score.',
       'The left half of the screen is the left flipper and the right half is the right, so a phone held upright is the whole controller. Hold low to charge the plunger. And you can shove the table when a shot is going wrong: three shoves and it tilts, which kills the flippers and hands the ball to gravity.',
@@ -91,9 +91,9 @@ export const GAMES = [
     meta: { developer: 'The Coop', released: 'Jul 2026', releasedISO: '2026-07', genreLine: 'Pinball · Missions' },
     capabilities: ['Touch', 'Keyboard', 'Offline', 'No ads'],
     controls: [
-      { key: 'TAP L', desc: 'Left flipper — the whole left half of the screen' },
-      { key: 'TAP R', desc: 'Right flipper — the whole right half' },
-      { key: 'HOLD', desc: 'Charge the plunger, release to launch' },
+      { key: 'Z / ←', desc: 'Left flipper — or tap the left half of the screen' },
+      { key: 'M / →', desc: 'Right flipper — or tap the right half of the screen' },
+      { key: 'SPACE', desc: 'Hold to charge, release to launch — or hold the launch button' },
       { key: '↔', desc: 'Nudge the table. Three shoves and it tilts' },
     ],
     tips: [

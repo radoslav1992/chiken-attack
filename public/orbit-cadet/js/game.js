@@ -15,6 +15,7 @@
 import { stepBall, stepFlipper, makeBall, BALL_R, SURF } from './physics.js';
 import { buildTable, BOUNDARY, RANKS, TABLE_W, TABLE_H } from './table.js';
 import { sfx } from './audio.js';
+import { cabinetLayout, bakeClassicArt, drawClassicBackglass } from './classic.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -27,8 +28,8 @@ const rand = (a = 1, b = 0) => b + Math.random() * (a - b);
  * blue-and-steel space cabinet this is meant to be. */
 const C = {
   deep: '#05091d', // the letterbox and the darkest felt
-  felt: '#0c1740',
-  feltLit: '#17275f',
+  felt: '#142743',
+  feltLit: '#345375',
   line: '#7fc9ff', // the cyan everything is printed in
   ink: '#eaf3ff',
   dim: '#8fa3cc',
@@ -44,7 +45,7 @@ const C = {
 };
 
 /* Three bumper caps, so the cluster reads as three things rather than one. */
-const BUMPER_CAP = [['#ffd88a', '#c8631d'], ['#a8e8ff', '#1f6ea8'], ['#ffb3a8', '#a83224']];
+const BUMPER_CAP = [['#ffd88a', '#c8631d'], ['#ffd88a', '#ab4823'], ['#ffe0a0', '#a34c24']];
 
 const BALLS_PER_GAME = 3;
 const TILT_LIMIT = 3; // nudges banked before the table tilts
@@ -115,13 +116,13 @@ export class Game {
     this.canvas.height = Math.round(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Fit the whole table, letterboxed, with a little breathing room.
-    const pad = 8;
-    this.scale = Math.min((this.w - pad * 2) / TABLE_W, (this.h - pad * 2) / TABLE_H);
-    this.offX = (this.w - TABLE_W * this.scale) / 2;
-    this.offY = (this.h - TABLE_H * this.scale) / 2;
     const wasWide = this.wide;
-    this.wide = this.offX > 70; // room beside the table for the backglass
+    this.cabinet = cabinetLayout(this.w, this.h);
+    this.scale = this.cabinet.scale;
+    this.tableYScale = this.cabinet.scaleY;
+    this.offX = this.cabinet.left;
+    this.offY = this.cabinet.top;
+    this.wide = this.cabinet.wide;
     this.bakeArt();
     /* Tell the shell which of the two score displays should be showing. With the
      * backglass drawn there is no reason for the DOM HUD to repeat it, and in
@@ -657,6 +658,7 @@ export class Game {
 
     this.bakeFelt(g);
     this.bakeRings(g);
+    bakeClassicArt(g);
     this.bakePanels(g);
     this.bakeLanes(g);
     this.bakeArrows(g);
@@ -904,7 +906,7 @@ export class Game {
     ctx.save();
     if (this.shake > 0.3) ctx.translate(rand(this.shake, -this.shake), rand(this.shake, -this.shake) * 0.5);
     ctx.translate(this.offX, this.offY);
-    ctx.scale(this.scale, this.scale);
+    ctx.scale(this.scale, this.scale * this.tableYScale);
 
     if (this._art) ctx.drawImage(this._art, 0, 0, TABLE_W, TABLE_H);
 
@@ -1239,47 +1241,9 @@ export class Game {
   /* A backglass in the margins, which is where a real cabinet puts the score. On
    * a phone there is no room and the DOM HUD carries it instead. */
   drawBackglass(ctx) {
-    const w = this.offX - 14;
-    if (w < 60) return;
-    const boxes = [
-      { x: 7, label: 'SCORE', value: this.score.toLocaleString('en-US') },
-      { x: this.w - w - 7, label: 'RANK', value: this.rank.toUpperCase() },
-    ];
-    for (const b of boxes) {
-      ctx.fillStyle = '#0b1230';
-      ctx.fillRect(b.x, this.offY, w, 118);
-      ctx.strokeStyle = 'rgba(127,201,255,0.4)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(b.x + 1, this.offY + 1, w - 2, 116);
-      ctx.textAlign = 'center';
-      ctx.fillStyle = C.dim;
-      ctx.font = '700 11px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
-      tracked(ctx, b.label, b.x + w / 2, this.offY + 26, 3);
-      ctx.fillStyle = C.amber;
-      ctx.font = `700 ${clamp(Math.floor(w / 6), 12, 26)}px ui-rounded, "Trebuchet MS", system-ui, sans-serif`;
-      ctx.fillText(b.value, b.x + w / 2, this.offY + 62);
-    }
-
-    // Mission panel under the left box.
-    if (this.mission) {
-      const x = 7;
-      ctx.fillStyle = '#0b1230';
-      ctx.fillRect(x, this.offY + 128, w, 96);
-      ctx.strokeStyle = C.green;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, this.offY + 129, w - 2, 94);
-      ctx.textAlign = 'center';
-      ctx.fillStyle = C.green;
-      ctx.font = '700 11px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
-      tracked(ctx, 'MISSION', x + w / 2, this.offY + 152, 3);
-      ctx.fillStyle = C.ink;
-      ctx.font = '700 13px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
-      ctx.fillText(`${this.missionProgress}/${this.mission.goal}`, x + w / 2, this.offY + 196);
-      ctx.fillStyle = C.dim;
-      ctx.font = '600 10px ui-rounded, "Trebuchet MS", system-ui, sans-serif';
-      ctx.fillText(this.mission.name.slice(0, 14), x + w / 2, this.offY + 174);
-    }
+    drawClassicBackglass(ctx, this);
   }
+
 }
 
 /* --- small drawing helpers ------------------------------------------------ */

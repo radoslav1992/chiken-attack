@@ -292,7 +292,7 @@ for (const zone of document.querySelectorAll('[data-nudge]')) {
 
 /* Keyboard: the arrangement a pinball player expects. */
 const LEFT = new Set(['ArrowLeft', 'a', 'A', 'z', 'Z', 'Shift']);
-const RIGHT = new Set(['ArrowRight', 'd', 'D', '/', "'"]);
+const RIGHT = new Set(['ArrowRight', 'd', 'D', 'm', 'M', '/', "'"]);
 const LAUNCH = new Set([' ', 'Spacebar', 'Enter']);
 const PAUSE = new Set(['p', 'P', 'Escape']);
 
