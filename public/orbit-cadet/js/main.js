@@ -2,6 +2,7 @@ import { attachArcade, isEditing, postScore } from '../../shared/arcade.js';
 /* Orbit Cadet boot: DOM shell, input, persistence, leaderboard, PWA. */
 
 import { Game } from './game.js';
+import { flipperSide } from './classic.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -251,15 +252,16 @@ game.on('gameover', (result) => {
 const active = new Map();
 
 for (const zone of document.querySelectorAll('[data-flip]')) {
-  const side = zone.dataset.flip;
   zone.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     zone.setPointerCapture(e.pointerId);
+    const side = flipperSide(e.clientX, game.cabinet);
     active.set(e.pointerId, side);
     game.flip(side, true);
   });
   const release = (e) => {
-    if (active.get(e.pointerId) !== side) return;
+    const side = active.get(e.pointerId);
+    if (!side) return;
     active.delete(e.pointerId);
     if (![...active.values()].includes(side)) game.flip(side, false);
   };
@@ -292,7 +294,7 @@ for (const zone of document.querySelectorAll('[data-nudge]')) {
 
 /* Keyboard: the arrangement a pinball player expects. */
 const LEFT = new Set(['ArrowLeft', 'a', 'A', 'z', 'Z', 'Shift']);
-const RIGHT = new Set(['ArrowRight', 'd', 'D', '/', "'"]);
+const RIGHT = new Set(['ArrowRight', 'd', 'D', 'm', 'M', '/', "'"]);
 const LAUNCH = new Set([' ', 'Spacebar', 'Enter']);
 const PAUSE = new Set(['p', 'P', 'Escape']);
 

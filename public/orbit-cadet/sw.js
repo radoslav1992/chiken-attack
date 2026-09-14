@@ -5,7 +5,7 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'orbit-cadet-arcade-20260914';
+const VERSION = 'orbit-cadet-classic-20260914-2';
 const SHELL = './';
 
 const ASSETS = [
@@ -16,6 +16,7 @@ const ASSETS = [
   'css/styles.css',
   'js/main.js',
   'js/game.js',
+  'js/classic.js',
   'js/physics.js',
   'js/table.js',
   'js/audio.js',

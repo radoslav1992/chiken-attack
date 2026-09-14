@@ -1,17 +1,17 @@
 /* Orbit Cadet — shell around the canvas, in the Beaver Games palette. */
 
 :root {
-  --bg: #0b0913;
-  --raise: #1b1830;
-  --line: #2b2646;
-  --line-mid: #3b3560;
-  --ink: #f6efe3;
-  --soft: #cfc7e4;
-  --dim: #9a92b8;
-  --ghost: #6f6795;
-  --amber: #ffb43d;
+  --bg: #080e19;
+  --raise: #1b2c43;
+  --line: #344b64;
+  --line-mid: #6b839a;
+  --ink: #e8eff5;
+  --soft: #c1d2e2;
+  --dim: #a0b4ca;
+  --ghost: #9dabc0;
+  --amber: #f0d68e;
   --red: #ff5240;
-  --teal: #43e0c0;
+  --teal: #bce48a;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -538,3 +538,46 @@ body {
     animation: none;
   }
 }
+
+/* The Orbit cabinet owns its blue metal finish, including shared arcade panels. */
+body[data-arcade="orbit-cadet"] .panel {
+  background: linear-gradient(135deg, #263b54, #111c2c) !important;
+  border: 2px solid #8c9eb0 !important;
+  border-radius: 3px !important;
+  box-shadow: inset 1px 1px 0 #c1cddb, inset -2px -2px 0 #060c16, 0 18px 60px #000b !important;
+}
+.panel-wrap {background: linear-gradient(#07101b65, #07101bc9);}
+.title, .title-sm {
+  font-family: "Arial Black", "Trebuchet MS", sans-serif;
+  font-style: italic;
+  color: #efe0a8;
+  text-shadow: 2px 2px 0 #243548, 4px 4px 0 #080f1b;
+  letter-spacing: -1px;
+}
+.kicker {color: #b6cbdf; font-size: 12px; letter-spacing: .18em;}
+.verbs li {font-size: 14px; color: #b9c9da;}
+.verbs li::before {background: #e5c56f;}
+.btn-big {
+  background: linear-gradient(#c2d0dc, #778dA4);
+  color: #101c2c; border: 2px solid #c2ceda; border-radius: 3px;
+  box-shadow: inset 1px 1px 0 #fff8, inset -1px -1px 0 #283e55, 3px 3px 0 #060c16;
+  min-height: 48px;
+}
+.btn-big:active {box-shadow: inset 1px 1px 3px #07111d;}
+.btn-small, .btn-pause {background: #142338; border-color: #617891; border-radius: 3px;}
+.btn-small:focus-visible, .btn-big:focus-visible, .btn-pause:focus-visible {
+  outline: 3px solid #f0d68e; outline-offset: 3px;
+}
+.hud-label {font-size: 11px; color: #b2c3d4;}
+.hud-block b {color: #cbed96; font-family: "Courier New",monospace; text-shadow: 0 0 10px #9ee47444;}
+.hud-top {padding: 7px 10px; background: #050b13e8; border: 1px solid #536a81;}
+.hud-row {top: calc(var(--safe-top) + 66px);}
+.hud.is-wide .hud-row {display: none;}
+.pill {font-size: 11px; letter-spacing: .04em; background: #07111de8;}
+.touch-plunge {background: #102139dd; border-color: #9eafbf; color: #eee0a6; font-size: 12px;}
+.touch-nudge {background: #0b1729b8;}
+.touch-nudge::after {color: #aac7e2;}
+.classic-keys {display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:16px 0;color:#becddd;font-size:12px;}
+.classic-keys kbd {border:1px solid #91a2b6;border-bottom-width:3px;background:#0b1727;color:#f0d68e;padding:3px 7px;border-radius:3px;font:700 12px "Courier New",monospace;}
+body[data-arcade="orbit-cadet"] .arcade-share {background:#c2d0dc;color:#142338;border-radius:3px;}
+body[data-arcade="orbit-cadet"] .arcade-result-summary {color:#cbed96;}
