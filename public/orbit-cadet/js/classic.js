@@ -21,6 +21,11 @@ export function cabinetLayout(width, height) {
     panel: { x: left + tableWidth + gap, y, w: panelWidth, h: tableHeight } };
 }
 
+/** Match touch input to the table, which sits left of the score tower on desktop. */
+export function flipperSide(clientX, cabinet) {
+  return clientX < cabinet.left + 280 * cabinet.scale ? 'L' : 'R';
+}
+
 function path(g, points, fill, stroke, width = 1) {
   g.beginPath(); g.moveTo(...points[0]);
   for (const p of points.slice(1)) g.lineTo(...p);

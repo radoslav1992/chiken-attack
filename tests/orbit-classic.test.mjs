@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cabinetLayout } from '../public/orbit-cadet/js/classic.js';
+import { cabinetLayout, flipperSide } from '../public/orbit-cadet/js/classic.js';
 
 const sizes = [[320,568],[390,844],[700,320],[800,500],[1280,800]];
 
@@ -52,5 +52,14 @@ test('classic renderer and cabinet layout survive launch, play, pause and missio
   } finally {
     if (previousWindow === undefined) delete globalThis.window; else globalThis.window=previousWindow;
     if (previousDocument === undefined) delete globalThis.document; else globalThis.document=previousDocument;
+  }
+});
+
+test('touch flippers follow the asymmetric table rather than the whole screen midpoint', () => {
+  for (const [w,h] of sizes) {
+    const layout=cabinetLayout(w,h);
+    const center=layout.left+280*layout.scale;
+    assert.equal(flipperSide(center-20,layout),'L');
+    assert.equal(flipperSide(center+20,layout),'R');
   }
 });
