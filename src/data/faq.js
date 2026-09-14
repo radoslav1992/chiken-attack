@@ -7,7 +7,7 @@
 export const FAQ = [
   {
     q: 'Are the games on Beaver Games really free?',
-    a: 'Yes — every game is free, with no tiers, coins, energy timers or unlockable content. There are no ads either. This is a hobby arcade: the games are free, the code is open source, and that is the whole business model.',
+    a: 'Yes — every game is free, with no paid tiers, purchases or energy timers. There are no ads either. This is a hobby arcade: the games are free, the code is open source, and that is the whole business model.',
   },
   {
     q: 'Do I need to download or install anything?',
@@ -19,7 +19,7 @@ export const FAQ = [
   },
   {
     q: 'Do I need an account to play or save progress?',
-    a: 'No accounts, ever. Personal bests and settings save on this device. Chicken Attack saves between waves; Whittle & Wares saves your forest, inventory and shop as you play. Clearing browser data removes these saves. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
+    a: 'No accounts, ever. Personal bests and settings save on this device. Chicken Attack saves between waves; Whittle & Wares saves your forest, inventory and shop as you play. Dam Defender saves battles and unlocks on this browser. Clearing browser data removes these saves. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
   },
   {
     q: 'What devices and browsers are supported?',
@@ -27,6 +27,6 @@ export const FAQ = [
   },
   {
     q: 'How do the leaderboards work?',
-    a: 'Each game has a weekly board that resets every Monday at 00:00 UTC. Scores are player-submitted and sorted highest first; earlier submissions win ties. Chicken Attack has separate difficulty boards. A challenge link shares a score target, not an identical random level.',
+    a: 'Each game has a weekly board that resets every Monday at 00:00 UTC. Scores are player-submitted and sorted highest first; earlier submissions win ties. Chicken Attack has separate difficulty boards. Dam Defender challenge links include the river, captain and seed for an identical starting setup; its daily river changes at 00:00 UTC. Other games share a score target.',
   },
 ];

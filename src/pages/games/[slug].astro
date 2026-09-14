@@ -285,7 +285,7 @@ const schema = [
   const challenge = challengeFrom(location.search);
   let frame: HTMLIFrameElement | null = null;
   let soundOn = true;
-  let lastResult: { score: number; mode: string } | null = null;
+  let lastResult: { score: number; mode: string; url?: string } | null = null;
   if (challenge) {
     const banner = document.querySelector<HTMLElement>(
       "[data-challenge-banner]",
@@ -301,6 +301,13 @@ const schema = [
     if (challenge) {
       url.searchParams.set("challenge", String(challenge.score));
       url.searchParams.set("mode", challenge.mode);
+    }
+    if (slug === "dam-defender") {
+      const params = new URLSearchParams(location.search);
+      for (const key of ["daily", "seed", "river", "captain"]) {
+        const value = params.get(key);
+        if (value && value.length <= 32) url.searchParams.set(key, value);
+      }
     }
     frame.src = url.href;
     frame.className = "stage-frame";
@@ -404,7 +411,14 @@ const schema = [
       !["rookie", "veteran", "superstar"].includes(mode)
     )
       return;
-    lastResult = { score, mode };
+    let resultUrl: string | undefined;
+    if (slug === "dam-defender" && typeof event.data.challengeUrl === "string") {
+      try {
+        const candidate = new URL(event.data.challengeUrl);
+        if (candidate.origin === location.origin && candidate.pathname === "/games/dam-defender/") resultUrl = candidate.href;
+      } catch {}
+    }
+    lastResult = { score, mode, url: resultUrl };
     if (shareBtn) shareBtn.textContent = "↗ Challenge a friend";
     if (feedback)
       feedback.textContent = `${score.toLocaleString()} points. Give a friend something to beat.`;
@@ -418,7 +432,7 @@ const schema = [
           ? `I scored ${lastResult.score.toLocaleString()} in ${stage.dataset.title}. Your turn.`
           : `Play ${stage.dataset.title} with me on Beaver Games.`,
         url: lastResult
-          ? scoreLink(slug, lastResult.score, lastResult.mode)
+          ? lastResult.url || scoreLink(slug, lastResult.score, lastResult.mode)
           : new URL(`/games/${slug}/`, location.origin).href,
       },
       feedback,
