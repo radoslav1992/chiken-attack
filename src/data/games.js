@@ -137,7 +137,33 @@ export const GAMES = [
     ],
   },
   { slug: 'neon-dodge', title: 'Neon Dodge', genre: 'Arcade', badge: 'SOON', playable: false },
-  { slug: 'dam-defender', title: 'Dam Defender', genre: 'Action', badge: 'SOON', playable: false },
+  {
+    slug: 'dam-defender', title: 'Dam Defender', genre: 'Strategy', badge: 'NEW', playable: true,
+    playPath: '/dam-defender/', art: '/media/dam-defender-card.svg', stageArt: '/media/dam-defender-card.svg', icon: '/dam-defender/icon.svg',
+    tagline: 'Small paws. Big responsibility.',
+    blurb: 'Build a woodland defence, open the floodgates and protect your beaver village. Three rivers. Endless possibilities.',
+    about: [
+      'A little village sits behind your dam. Choose where to build acorn turrets, log launchers, bramble gardens, watermills and watchtowers, then defend against waves of woodland raiders. Floods sweep back ground enemies, but flying herons stay above the water. Drain the reservoir too far and your dam becomes vulnerable.',
+      'Protect Willow Bend, Copper Fork and Moonwater Marsh, each with its own routes and boss. Pick a new perk every three waves, branch your tower upgrades and unlock captains with different abilities. Beat wave twelve to protect a river, then continue into endless mode. A daily river gives everyone the same map, captain and seed; challenge links let friends replay your setup. Your battle saves on this browser, including enemies already on the trail.',
+    ],
+    stats: { rating: '—', size: '0.1 MB', runTime: '10–15 min', players: '1' },
+    meta: { developer: 'The Coop', released: 'Sep 2026', releasedISO: '2026-09', genreLine: 'Strategy · Tower defence' },
+    capabilities: ['Touch', 'Keyboard', 'Offline', 'Saves', 'No ads'],
+    controls: [
+      { key: 'TAP', desc: 'Select a clearing, choose a tower, then build' },
+      { key: 'SPACE', desc: 'Send the next wave' },
+      { key: 'F', desc: 'Open floodgates · costs 40 water' },
+      { key: '1–5', desc: 'Choose a tower type; arrows select a clearing, Enter builds' },
+      { key: 'P', desc: 'Pause and save your defence' },
+    ],
+    tips: [
+      'Start with two Acorn turrets close to the trail. Build sites near bends cover enemies for longer.',
+      'Logs and brambles control ground crowds. Acorns and watchtowers also hit flying herons.',
+      'Keep 25 water in reserve: below that, the dam takes 50% more damage. Floods cost 40.',
+      'Watermills fund future upgrades, but cannot stop a raider. Balance income against damage.',
+      'Inspect the next wave, repair between battles, and choose perks that strengthen your tower mix.',
+    ],
+  },
 ];
 
 export const PLAYABLE = GAMES.filter((g) => g.playable);

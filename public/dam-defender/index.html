@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#203c32" />
+    <meta
+      name="description"
+      content="Build a woodland defence. Open the floodgates. Protect your beaver village across three rivers, daily challenges and endless waves. Free browser tower defence."
+    />
+    <title>Dam Defender · Beaver Games</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <header class="masthead">
+        <a href="/" class="arcade-link">← Beaver Games</a
+        ><span class="edition">A woodland defence game</span
+        ><button id="sound" class="quiet" type="button" aria-pressed="true">
+          Sound on ♪
+        </button>
+      </header>
+      <section id="menu-screen" class="menu-screen" aria-labelledby="title">
+        <div class="intro">
+          <p class="eyebrow">Small paws. Big responsibility.</p>
+          <h1 id="title">DAM<br /><span>DEFENDER.</span></h1>
+          <p class="lead">
+            A little village. A wild river.<br />Build your defence. Make a
+            splash.
+          </p>
+          <div class="hero-art" aria-hidden="true">
+            <img src="cover.svg" alt="" />
+          </div>
+          <p class="menu-note">
+            Build at your pace · 12 waves per river · Save anytime
+          </p>
+        </div>
+        <div class="expedition">
+          <div class="section-heading">
+            <span class="eyebrow">01 / Choose your river</span
+            ><span id="completion" class="tag">0 / 3 protected</span>
+          </div>
+          <div id="map-list" class="map-list"></div>
+          <div class="section-heading captain-heading">
+            <label class="eyebrow" for="captain">02 / Meet your captain</label>
+          </div>
+          <select id="captain" aria-describedby="captain-note"></select>
+          <p id="captain-note" class="muted"></p>
+          <button id="start" class="primary large" type="button">
+            Defend Willow Bend →
+          </button>
+          <button id="continue" class="secondary full hidden" type="button">
+            Continue saved defence
+          </button>
+          <button id="invitation" class="secondary full hidden" type="button">
+            Play your friend’s river →
+          </button>
+          <div class="daily-card">
+            <div>
+              <span class="eyebrow">THE DAILY RIVER</span>
+              <h2 id="daily-title">A fresh challenge</h2>
+              <p id="daily-note" class="muted"></p>
+            </div>
+            <button
+              id="daily"
+              class="round-button"
+              aria-label="Play the daily river"
+              type="button"
+            >
+              ↗
+            </button>
+          </div>
+          <details class="how">
+            <summary>How to hold the river</summary>
+            <ol>
+              <li>
+                Select a numbered clearing and build a tower. Spend wood between
+                waves.
+              </li>
+              <li>
+                Acorns and watchtowers hit flying foes. Logs and brambles
+                control ground raiders.
+              </li>
+              <li>
+                Open the floodgates when enemies cluster. Each flood costs 40
+                water; below 25, your dam takes more damage.
+              </li>
+              <li>
+                Choose a woodland perk every three waves. Beat the boss at wave
+                12, or keep going in endless mode.
+              </li>
+            </ol>
+            <p>
+              Space: start wave · F: flood · P: pause · 1–5: choose tower ·
+              arrows: select clearing · Enter: build
+            </p>
+          </details>
+          <p id="menu-message" class="muted" role="status"></p>
+        </div>
+      </section>
+
+      <section id="run-screen" class="hidden" aria-label="Your defence">
+        <div class="run-heading">
+          <div>
+            <p id="run-label" class="eyebrow">WILLOW BEND</p>
+            <h2 id="phase-title">Make yourself at home.</h2>
+          </div>
+          <div class="run-options">
+            <button id="speed" class="quiet" type="button" aria-pressed="false">
+              1× speed</button
+            ><button id="pause" class="secondary small" type="button">
+              Pause ❚❚
+            </button>
+          </div>
+        </div>
+        <div class="hud" aria-label="Resources">
+          <div>
+            <span>DAM STRENGTH</span><strong id="hp">120 / 120</strong
+            ><meter id="hp-meter" min="0" max="120" value="120">120</meter>
+          </div>
+          <div>
+            <span>RESERVOIR</span><strong id="water">100 / 100</strong
+            ><meter id="water-meter" min="0" max="100" value="100">100</meter>
+          </div>
+          <div><span>WOOD</span><strong id="wood">170</strong></div>
+          <div><span>SCORE</span><strong id="score">0</strong></div>
+        </div>
+        <div class="play-layout">
+          <div class="arena-column">
+            <div class="arena">
+              <canvas
+                id="game"
+                width="960"
+                height="600"
+                role="img"
+                aria-label="River map. Use the numbered clearing buttons below to place towers."
+              ></canvas
+              ><span id="wave-tag" class="wave-tag">PREPARE · WAVE 1</span>
+            </div>
+            <div
+              id="pads"
+              class="pads"
+              role="group"
+              aria-label="Choose a clearing"
+            ></div>
+            <p
+              id="message"
+              class="message"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </div>
+          <aside class="build-panel" aria-label="Build and command">
+            <div class="section-heading">
+              <h3 id="site-title">Choose a clearing</h3>
+              <span id="site-number" class="tag">+ BUILD</span>
+            </div>
+            <div id="tower-list" class="tower-list"></div>
+            <div id="tower-detail" class="tower-detail"></div>
+            <div id="site-actions" class="site-actions"></div>
+            <div class="command-panel">
+              <p id="forecast" class="forecast"></p>
+              <button id="next-wave" class="primary full" type="button">
+                Send wave 1 →</button
+              ><button
+                id="flood"
+                class="flood-button full"
+                type="button"
+                disabled
+              >
+                Open floodgates · 40 water</button
+              ><button id="repair" class="quiet full" type="button">
+                Repair 30 strength · 40 wood
+              </button>
+              <p id="water-note" class="tiny">
+                Keep 25 water in reserve to protect your dam.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <p id="save-status" class="save-status" role="status"></p>
+    </main>
+
+    <dialog id="dialog" aria-labelledby="dialog-title">
+      <div class="dialog-inner">
+        <p id="dialog-eyebrow" class="eyebrow">TAKE A BREATHER</p>
+        <h2 id="dialog-title">River on pause.</h2>
+        <p id="dialog-note" class="muted"></p>
+        <div id="pause-content">
+          <button id="resume" class="primary full" type="button">
+            Back to the river →</button
+          ><button id="menu" class="secondary full" type="button">
+            Save & return to menu
+          </button>
+        </div>
+        <div id="draft-content" class="hidden">
+          <div id="perks" class="perk-list"></div>
+        </div>
+        <div id="result-content" class="hidden">
+          <div id="result-stats" class="result-stats"></div>
+          <p id="unlock-note" class="unlock-note"></p>
+          <button id="endless" class="primary full" type="button">
+            Keep going · endless river →</button
+          ><button id="replay" class="secondary full" type="button">
+            Try this river again</button
+          ><button id="result-menu" class="quiet full" type="button">
+            Choose another river</button
+          ><button id="share" class="share-button full" type="button">
+            Challenge a friend ↗
+          </button>
+          <p id="share-status" class="tiny" role="status"></p>
+          <form id="name-form">
+            <label for="name-input">Name on the community board</label>
+            <div class="name-row">
+              <input
+                id="name-input"
+                maxlength="12"
+                autocomplete="nickname"
+                value="BEAVER"
+              /><button class="secondary" type="submit">Save name</button>
+            </div>
+          </form>
+          <p class="tiny">
+            Community scores are player-submitted. Your challenge link keeps the
+            same river, captain and seed.
+          </p>
+        </div>
+        <div id="replace-content" class="hidden">
+          <p class="muted">
+            Starting this expedition replaces the defence saved on this browser.
+          </p>
+          <button id="replace" class="primary full" type="button">
+            Start the new expedition</button
+          ><button id="keep-save" class="secondary full" type="button">
+            Keep my saved defence
+          </button>
+        </div>
+      </div>
+    </dialog>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
