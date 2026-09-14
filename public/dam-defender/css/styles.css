@@ -732,24 +732,35 @@ dialog::backdrop {
     font-size: 14px;
   }
   .hero-art {
-    position: absolute;
-    right: -4px;
-    top: 83px;
-    width: 47%;
+    grid-column: 2;
+    grid-row: 3 / 5;
+    width: 100%;
+    max-width: 260px;
+    justify-self: end;
     margin: 0;
     opacity: 0.9;
   }
   .intro {
-    min-height: 262px;
+    display: grid;
+    grid-template-columns: 1fr 0.85fr;
+    column-gap: 12px;
+    align-items: start;
+  }
+  .intro > .eyebrow,
+  .intro h1 {
+    grid-column: 1 / -1;
   }
   .intro h1 {
     font-size: clamp(49px, 12vw, 76px);
   }
   .intro .lead {
-    max-width: 53%;
+    grid-column: 1;
+    grid-row: 3;
     font-size: 12px;
   }
   .menu-note {
+    grid-column: 1;
+    grid-row: 4;
     font-size: 10px;
     margin-top: 14px;
   }

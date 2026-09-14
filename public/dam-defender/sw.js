@@ -1,4 +1,4 @@
-const VERSION = 'dam-defender-v1-20260914';
+const VERSION = 'dam-defender-v2-20260914';
 const ASSETS = [
   './',
   'css/styles.css',
