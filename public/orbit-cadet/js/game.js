@@ -215,7 +215,11 @@ export class Game {
 
   pause() {
     if (this.state !== 'playing') return false;
+    this.flip('L', false);
+    this.flip('R', false);
     this.state = 'paused';
+    this.plungerHeld = false;
+    this.plunger = 0;
     this.emit('pause', true);
     return true;
   }

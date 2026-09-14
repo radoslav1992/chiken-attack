@@ -5,7 +5,7 @@
  * of files; icons and the manifest stay cache-first with background refresh.
  */
 
-const VERSION = 'chicken-attack-v7';
+const VERSION = 'chicken-attack-arcade-20260914';
 
 /*
  * './' is the canonical app shell URL. Hosts that normalise /index.html to /
@@ -15,6 +15,8 @@ const VERSION = 'chicken-attack-v7';
 const SHELL = './';
 
 const ASSETS = [
+  '/shared/arcade.js',
+  '/shared/arcade.css',
   SHELL,
   'manifest.webmanifest',
   'css/styles.css',

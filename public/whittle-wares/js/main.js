@@ -1,3 +1,4 @@
+import { attachArcade, isEditing, postScore } from '../../shared/arcade.js';
 /* Whittle & Wares boot: input, the DOM half of the game, persistence, PWA. */
 
 import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, priceOutlook, priceCeiling, priceLabel, stockCapacity, DAYS_TARGET } from './game.js';
@@ -66,13 +67,7 @@ function submitScore(result) {
 
 function pushScore() {
   if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: traderName.get() }),
-  }).catch(() => {
-    /* offline — the local best still stands */
-  });
+  postScore(lastRun, traderName.get());
 }
 
 /* ----------------------------------------------------------------- screens -- */
@@ -636,6 +631,8 @@ const KEYMAP = {
 };
 
 window.addEventListener('keydown', (e) => {
+  if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.repeat && ['p', 'P', 'Escape'].includes(e.key)) return;
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
     e.preventDefault();
     togglePause();
@@ -662,7 +659,12 @@ function togglePause() {
   paused = !paused;
   show(SCREENS.pause, paused);
   show(hudEl, !paused);
-  if (paused) game.stop();
+  if (paused) {
+    for (const key of ['left','right','up','down']) game.key(key, false);
+    game.setStick(null);
+    stickId = null; stickOrigin = null;
+    game.stop();
+  }
   else game.start();
   sfx.ui();
 }
@@ -675,7 +677,8 @@ $('#btn-resume').addEventListener('click', () => togglePause());
 $('#btn-quit').addEventListener('click', () => {
   paused = false;
   game.stop();
-  store.del(SAVE_KEY);
+  // Keep the existing start-of-day checkpoint; mid-day inventory must not
+  // be restored into a fresh forest with replenished stamina and resources.
   game.phase = 'menu';
   showOnly('menu');
   refreshMenu();
@@ -730,6 +733,10 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => game.resize(), 80);
 });
 
+window.addEventListener('blur', () => {
+  if (game.phase === 'forage' && !paused) togglePause();
+});
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && game.phase === 'forage' && !paused) togglePause();
 });
@@ -758,3 +765,6 @@ refreshMenu();
 showOnly('menu');
 game.resize();
 game.start();
+
+attachArcade(game, { slug: 'whittle-wares', title: 'Whittle & Wares', resultSelector: '#screen-over .panel', mode: r => r.difficulty?.id || 'veteran' });
+if (window.parent !== window) document.body.dataset.embedded = '';

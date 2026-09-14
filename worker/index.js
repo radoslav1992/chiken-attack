@@ -10,8 +10,8 @@
  *        renames the run instead of adding a second row.
  *   POST /api/signup { email }                             → { ok: true }
  *
- * If the D1 binding is missing (database not created yet), reads return empty
- * lists and writes 503 — the site keeps working without the board.
+ * If the D1 binding is missing, reads and writes return 503 so the UI can
+ * distinguish an unavailable board from an empty one. Local games still work.
  */
 
 /* Straight from the arcade's own list rather than a copy of it. The copy was
@@ -58,19 +58,21 @@ function cleanName(raw) {
 async function getScores(env, url) {
   const game = url.searchParams.get('game') || '';
   if (!KNOWN_GAMES.has(game)) return error('unknown game', 400);
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || 10));
+  const limit = Math.min(50, Math.max(1, Math.floor(Number(url.searchParams.get('limit'))) || 10));
   const period = url.searchParams.get('period') === 'all' ? 'all' : 'week';
-  if (!env.DB) return json({ scores: [], period });
+  const difficulty = url.searchParams.get('difficulty') || 'veteran';
+  if (!DIFFICULTIES.has(difficulty)) return error('bad difficulty', 400);
+  if (!env.DB) return error('leaderboard not configured', 503);
 
   const since = period === 'week' ? weekStartIso() : '0000';
   const { results } = await env.DB.prepare(
     `SELECT name, score, wave, difficulty, created_at
        FROM scores
-      WHERE game = ?1 AND created_at >= ?2
+      WHERE game = ?1 AND created_at >= ?2 AND difficulty = ?4
       ORDER BY score DESC, created_at ASC
       LIMIT ?3`
   )
-    .bind(game, since, limit)
+    .bind(game, since, limit, difficulty)
     .all();
   return json({ scores: results, period });
 }
@@ -83,17 +85,18 @@ async function postScore(env, request) {
     return error('invalid json', 400);
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return error('invalid body', 400);
   const id = String(body.id || '').slice(0, 64);
   const game = String(body.game || '');
-  const score = Math.floor(Number(body.score));
-  const wave = Math.floor(Number(body.wave) || 0);
+  const score = body.score;
+  const wave = body.wave ?? 0;
   const difficulty = String(body.difficulty || 'veteran');
   const name = cleanName(body.name);
 
   if (!/^[a-z0-9-]{8,64}$/.test(id)) return error('bad run id', 400);
   if (!KNOWN_GAMES.has(game)) return error('unknown game', 400);
-  if (!Number.isFinite(score) || score < 0 || score > MAX_SCORE) return error('bad score', 400);
-  if (wave < 0 || wave > MAX_WAVE) return error('bad wave', 400);
+  if (!Number.isSafeInteger(score) || score < 0 || score > MAX_SCORE) return error('bad score', 400);
+  if (!Number.isSafeInteger(wave) || wave < 0 || wave > (game === 'beaver-dash' ? 1_000_000 : MAX_WAVE)) return error('bad wave', 400);
   if (!DIFFICULTIES.has(difficulty)) return error('bad difficulty', 400);
   if (!env.DB) return error('leaderboard not configured', 503);
 
@@ -117,6 +120,7 @@ async function postSignup(env, request) {
   } catch {
     return error('invalid json', 400);
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return error('invalid body', 400);
   // Honeypot: bots fill every field; humans never see this one.
   if (body.website) return json({ ok: true });
   const email = String(body.email || '').trim().toLowerCase().slice(0, 254);

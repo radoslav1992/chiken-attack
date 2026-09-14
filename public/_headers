@@ -113,3 +113,18 @@
 
 /orbit-cadet/icons/*
   Cache-Control: public, max-age=604800
+
+/shared/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/whittle-wares/sw.js
+  Cache-Control: no-cache, must-revalidate
+
+/whittle-wares/
+  Cache-Control: no-cache, must-revalidate
+
+/whittle-wares/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/whittle-wares/css/*
+  Cache-Control: public, max-age=0, must-revalidate

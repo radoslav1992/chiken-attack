@@ -1,3 +1,4 @@
+import { attachArcade, isEditing, postScore } from '../../shared/arcade.js';
 /* Orbit Cadet boot: DOM shell, input, persistence, leaderboard, PWA. */
 
 import { Game } from './game.js';
@@ -66,13 +67,7 @@ function submitGlobalScore(result) {
 
 function pushGlobalScore() {
   if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: pilotName.get() }),
-  }).catch(() => {
-    /* offline — the local best still works */
-  });
+  postScore(lastRun, pilotName.get());
 }
 
 /* ---------------------------------------------------------------- screens -- */
@@ -266,10 +261,11 @@ for (const zone of document.querySelectorAll('[data-flip]')) {
   const release = (e) => {
     if (active.get(e.pointerId) !== side) return;
     active.delete(e.pointerId);
-    game.flip(side, false);
+    if (![...active.values()].includes(side)) game.flip(side, false);
   };
   zone.addEventListener('pointerup', release);
   zone.addEventListener('pointercancel', release);
+  zone.addEventListener('lostpointercapture', release);
 }
 
 const plungeZone = $('[data-plunge]');
@@ -301,6 +297,8 @@ const LAUNCH = new Set([' ', 'Spacebar', 'Enter']);
 const PAUSE = new Set(['p', 'P', 'Escape']);
 
 window.addEventListener('keydown', (e) => {
+  if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.repeat && ['p', 'P', 'Escape'].includes(e.key)) return;
   if (PAUSE.has(e.key)) {
     e.preventDefault();
     if (game.state === 'playing') {
@@ -316,7 +314,10 @@ window.addEventListener('keydown', (e) => {
     if (LAUNCH.has(e.key)) e.preventDefault();
     return;
   }
-  if (LEFT.has(e.key)) {
+  if (e.code === 'ShiftRight') {
+    e.preventDefault();
+    game.flip('R', true);
+  } else if (LEFT.has(e.key)) {
     e.preventDefault();
     game.flip('L', true);
   } else if (RIGHT.has(e.key)) {
@@ -338,7 +339,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('keyup', (e) => {
-  if (LEFT.has(e.key)) game.flip('L', false);
+  if (e.code === 'ShiftRight') game.flip('R', false);
+  else if (LEFT.has(e.key)) game.flip('L', false);
   else if (RIGHT.has(e.key)) game.flip('R', false);
   else if (LAUNCH.has(e.key)) game.plungeHold(false);
 });
@@ -393,3 +395,6 @@ syncSoundButtons();
 game.resize();
 applyLayout(game.wide);
 game.start();
+
+attachArcade(game, { slug: 'orbit-cadet', title: 'Orbit Cadet', resultSelector: '#screen-over .panel', mode: r => r.difficulty?.id || 'veteran' });
+if (window.parent !== window) document.body.dataset.embedded = '';

@@ -1,3 +1,4 @@
+import { attachArcade, isEditing, postScore } from '../../shared/arcade.js';
 /* Beaver Dash boot: DOM shell, input, persistence, leaderboard, PWA. */
 
 import { Game } from './game.js';
@@ -83,13 +84,7 @@ function submitGlobalScore(result) {
 
 function pushGlobalScore() {
   if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: pilotName.get() }),
-  }).catch(() => {
-    /* offline or standalone install — local best still works */
-  });
+  postScore(lastRun, pilotName.get());
 }
 
 /* ---------------------------------------------------------------- screens -- */
@@ -115,6 +110,8 @@ function startRun() {
   show(overEl, false);
   show(pauseEl, false);
   show(hudEl, true);
+  lastMult = 1; lastShield = 0; lastPhase = '';
+  show(multEl, false); show(shieldEl, false);
   game.bestDistance = best.get().distance || 0;
   resetCoach();
   game.newRun();
@@ -308,16 +305,27 @@ game.on('gameover', (result) => {
 const JUMP_KEYS = new Set([' ', 'Spacebar', 'ArrowUp', 'w', 'W']);
 const PAUSE_KEYS = new Set(['p', 'P', 'Escape']);
 
+let jumpPointer = null;
 canvas.addEventListener('pointerdown', (e) => {
-  if (game.state === 'playing') {
-    e.preventDefault();
-    game.jumpDown();
-  }
+  if (game.state !== 'playing' || jumpPointer !== null) return;
+  e.preventDefault();
+  jumpPointer = e.pointerId;
+  canvas.setPointerCapture(e.pointerId);
+  if (!game.jumpHeld) game.jumpDown();
 });
-window.addEventListener('pointerup', () => game.jumpUp());
-window.addEventListener('pointercancel', () => game.jumpUp());
+const releaseJump = (e) => {
+  if (e.pointerId !== jumpPointer) return;
+  jumpPointer = null;
+  game.jumpUp();
+};
+window.addEventListener('pointerup', releaseJump);
+window.addEventListener('pointercancel', releaseJump);
+canvas.addEventListener('lostpointercapture', releaseJump);
+window.addEventListener('blur', () => { jumpPointer = null; game.jumpUp(); });
 
 window.addEventListener('keydown', (e) => {
+  if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.repeat && ['p', 'P', 'Escape'].includes(e.key)) return;
   if (PAUSE_KEYS.has(e.key)) {
     e.preventDefault();
     if (game.state === 'playing') {
@@ -390,3 +398,6 @@ syncSoundButtons();
 game.bestDistance = best.get().distance || 0;
 game.resize();
 game.start();
+
+attachArcade(game, { slug: 'beaver-dash', title: 'Beaver Dash', resultSelector: '#screen-over .panel', mode: r => r.difficulty?.id || 'veteran' });
+if (window.parent !== window) document.body.dataset.embedded = '';

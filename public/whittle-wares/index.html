@@ -20,7 +20,8 @@
     <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/styles.css" />
-  </head>
+    <link rel="stylesheet" href="/shared/arcade.css" />
+</head>
   <body>
     <canvas id="game" aria-label="The wood" role="img"></canvas>
 
@@ -168,13 +169,15 @@
       <section id="screen-pause" class="screen is-hidden">
         <div class="panel">
           <h2 class="panel-h">Paused</h2>
+          <p class="panel-note">Returning to the menu keeps your start-of-day checkpoint.</p>
           <button id="btn-resume" class="btn btn-primary" type="button">Back to it</button>
           <button id="btn-sound-2" class="btn btn-quiet" type="button">♪ Sound on</button>
-          <button id="btn-quit" class="btn btn-ghost" type="button">Give up the lease</button>
+          <button id="btn-quit" class="btn btn-ghost" type="button">Return to menu</button>
         </div>
       </section>
     </div>
 
     <script type="module" src="js/main.js"></script>
-  </body>
+    <a class="arcade-home-link" href="/">← Arcade</a>
+</body>
 </html>

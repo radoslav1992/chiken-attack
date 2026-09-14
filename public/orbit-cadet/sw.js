@@ -5,10 +5,12 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'orbit-cadet-v2';
+const VERSION = 'orbit-cadet-arcade-20260914';
 const SHELL = './';
 
 const ASSETS = [
+  '/shared/arcade.js',
+  '/shared/arcade.css',
   SHELL,
   'manifest.webmanifest',
   'css/styles.css',
