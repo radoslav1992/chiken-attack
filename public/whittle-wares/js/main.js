@@ -1,8 +1,30 @@
 import { attachArcade, isEditing, postScore } from '../../shared/arcade.js';
 /* Whittle & Wares boot: input, the DOM half of the game, persistence, PWA. */
 
-import { Game, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, rentDue, RENT_EVERY, suggestedPrice, priceOutlook, priceCeiling, priceLabel, stockCapacity, DAYS_TARGET } from './game.js';
+import {
+  Game,
+  ITEMS,
+  RECIPES,
+  UPGRADES,
+  UPGRADE_BY_ID,
+  rentDue,
+  RENT_EVERY,
+  suggestedPrice,
+  priceOutlook,
+  priceCeiling,
+  priceLabel,
+  stockCapacity,
+  DAYS_TARGET,
+} from './game.js';
 import { orderSlots, orderFillable } from './economy.js';
+import {
+  seasonAt,
+  eventAt,
+  seasonGoals,
+  BADGES,
+  SPECIALISATIONS,
+  specialisation,
+} from './progression.js';
 import { itemIcon, customerSprite } from './art.js';
 import { sfx, unlock, setSound, soundOn } from './audio.js';
 
@@ -31,7 +53,16 @@ const store = {
   set(k, v) {
     try {
       localStorage.setItem(k, JSON.stringify(v));
-    } catch {}
+      if (k === SAVE_KEY) show($('#save-warning'), false);
+      return true;
+    } catch {
+      if (k === SAVE_KEY) {
+        $('#save-warning').textContent =
+          'Saving is unavailable in this browser. Keep this tab open to keep your shop.';
+        show($('#save-warning'), true);
+      }
+      return false;
+    }
   },
   del(k) {
     try {
@@ -52,9 +83,10 @@ let lastRun = null;
 function submitScore(result) {
   if (result.score <= 0) return;
   const id =
-    typeof crypto !== 'undefined' && crypto.randomUUID
+    result.id ||
+    (typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
-      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+      : `run-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`);
   lastRun = {
     id,
     game: 'whittle-wares',
@@ -107,7 +139,8 @@ function iconImg(id) {
 
 const iconCache = new Map();
 function icon(id) {
-  if (!iconCache.has(id)) iconCache.set(id, itemIcon(id, ITEMS[id].colour).toDataURL());
+  if (!iconCache.has(id))
+    iconCache.set(id, itemIcon(id, ITEMS[id].colour).toDataURL());
   const img = document.createElement('img');
   img.className = 'ico';
   img.alt = '';
@@ -147,7 +180,7 @@ function renderObjective() {
 
   const home = game.homeInfo();
   const atDoor = home.paces <= 2;
-  const label = atDoor ? '✓ at the door' : `↩ door · ${home.paces} paces`;
+  const label = '↩ Return to shop';
   if (objHome.textContent !== label) objHome.textContent = label;
   objEl.classList.toggle('is-home', atDoor);
 
@@ -160,7 +193,7 @@ function renderObjective() {
 
 game.on('hud', () => {
   renderObjective();
-  hudDay.textContent = `Day ${game.day}`;
+  hudDay.textContent = `${seasonAt(game.day).name} · Day ${game.day}`;
   hudGold.textContent = Math.round(game.gold).toLocaleString('en-US');
   const frac = game.maxStam ? Math.max(0, game.stamina / game.maxStam) : 1;
   // A custom property, not an inline style attribute — the CSP refuses those.
@@ -174,6 +207,7 @@ game.on('hud', () => {
 /* ------------------------------------------------------------------ phases -- */
 
 game.on('phase', (phase, reason) => {
+  paused = false;
   if (phase === 'forage') {
     showOnly('forage');
     renderObjective();
@@ -205,7 +239,11 @@ game.on('phase', (phase, reason) => {
 
 function renderCraft(reason) {
   $('#craft-sub').textContent =
-    (reason ? `${reason} ` : '') + 'Turn materials into goods worth more than their parts.';
+    (reason ? `${reason} ` : '') +
+    'Turn materials into goods worth more than their parts.' +
+    (game.nextOrder()
+      ? ` Commission: ${game.nextOrder().qty}× ${ITEMS[game.nextOrder().item].name} by day ${game.nextOrder().due}.`
+      : '');
   const list = $('#craft-list');
   list.textContent = '';
   const book = game.recipeBook();
@@ -223,7 +261,11 @@ function renderCraft(reason) {
       ? Object.entries(RECIPES[id])
           .map(([k, v]) => `${v}x ${ITEMS[k].name} (have ${game.inv[k] || 0})`)
           .join(', ')
-      : 'Needs the Master Bench';
+      : {
+          chime: 'Guild Artisan I · after day 30',
+          chest: 'Guild Artisan III · after day 30',
+          clock: 'Guild Artisan V · after day 30',
+        }[id] || 'Needs the Master Bench';
     nm.append(b, sp);
     li.append(nm);
     const btn = document.createElement('button');
@@ -236,6 +278,19 @@ function renderCraft(reason) {
       if (game.craft(id)) renderCraft();
     });
     li.append(btn);
+    if (known) {
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'mini batch';
+      all.textContent = 'All';
+      all.setAttribute('aria-label', `Craft all ${ITEMS[id].name}`);
+      all.disabled = btn.disabled;
+      all.addEventListener('click', () => {
+        game.craft(id, 1000);
+        renderCraft();
+      });
+      li.append(all);
+    }
     list.append(li);
   }
 }
@@ -251,7 +306,7 @@ function renderShop(reason) {
   const m = game.market;
   const hot = m.hot.map((h) => ITEMS[h].name).join(' and ');
   $('#shop-market').textContent =
-    `${reason ? reason + ' ' : ''}Wanted today: ${hot}. Nobody wants ${ITEMS[m.cold].name}.`;
+    `${reason ? reason + ' ' : ''}${game.event.name}: ${game.event.text} Wanted: ${hot}. Lower demand: ${ITEMS[m.cold].name}.`;
 
   const list = $('#price-list');
   list.textContent = '';
@@ -270,7 +325,12 @@ function renderShop(reason) {
     b.textContent = `${ITEMS[id].name} ×${game.shelf[id]}`;
     const sp = document.createElement('span');
     const sug = suggestedPrice(id, m);
-    const tag = m.mult[id] >= 1.4 ? ' — wanted today' : m.mult[id] < 1 ? ' — glutted' : '';
+    const tag =
+      m.mult[id] >= 1.4
+        ? ' — wanted today'
+        : m.mult[id] < 1
+          ? ' — glutted'
+          : '';
     sp.textContent = `going rate ${sug}${tag}`;
     if (tag) sp.className = m.mult[id] >= 1.4 ? 'hot' : 'cold';
     nm.append(b, sp);
@@ -341,10 +401,23 @@ function renderShop(reason) {
   const cap = stockCapacity(game.upgrades);
   let held = 0;
   for (const k in game.inv) held += game.inv[k];
-  const backroom = held ? `${held} more in the back — the shelves only hold ${cap}. ` : '';
+  const backroom = held
+    ? `${held} in the back (including commission supplies). The shelves hold ${cap}. `
+    : '';
   $('#shop-note').textContent =
     `${backroom}Green is buyers, amber hagglers, red walkouts. Open up and the day's customers come in one at a time.`;
 }
+
+document.querySelectorAll('[data-pricing]').forEach((btn) =>
+  btn.addEventListener('click', () => {
+    for (const id of game.onShelf())
+      game.setPrice(
+        id,
+        suggestedPrice(id, game.market) * Number(btn.dataset.pricing),
+      );
+    renderShop();
+  }),
+);
 
 $('#btn-open').addEventListener('click', () => {
   sfx.ui();
@@ -363,8 +436,11 @@ game.on('customer', (c, what, deal) => {
 
   $('#cust-name').textContent = c.name;
   const price = game.prices[c.wants];
-  const ledger = game.upgrades.includes('ledger') ? ` They would go to ${c.wtp}.` : '';
-  $('#cust-line').textContent = `Wants ${c.qty}× ${ITEMS[c.wants].name}. You are asking ${price}.${ledger}`;
+  const ledger = game.upgrades.includes('ledger')
+    ? ` They would go to ${c.wtp}.`
+    : '';
+  $('#cust-line').textContent =
+    `Wants ${c.qty}× ${ITEMS[c.wants].name}. You are asking ${price}.${ledger}`;
 
   const v = $('#cust-verdict');
   v.classList.remove('is-good', 'is-bad');
@@ -384,6 +460,13 @@ game.on('customer', (c, what, deal) => {
     `Today: ${game.daySold} sold, ${game.dayTakings} coin, ${game.dayWalkouts} walked out. ${game.queue.length} still waiting.`;
 });
 
+$('#btn-speed').addEventListener('click', () => {
+  game.fastServe = !game.fastServe;
+  $('#btn-speed').textContent =
+    `Serving speed: ${game.fastServe ? 'quick' : 'normal'}`;
+  $('#btn-speed').setAttribute('aria-pressed', String(game.fastServe));
+});
+
 $('#btn-accept').addEventListener('click', () => game.answerHaggle(true));
 $('#btn-hold').addEventListener('click', () => game.answerHaggle(false));
 
@@ -401,9 +484,14 @@ function renderEvening() {
     ['Standing', reputationWord(game.rep)],
     ['In the purse', `${Math.round(game.gold)} coin`],
   ];
-  const spoiledIds = Object.keys(game.spoiled || {}).filter((k) => game.spoiled[k]);
+  const spoiledIds = Object.keys(game.spoiled || {}).filter(
+    (k) => game.spoiled[k],
+  );
   if (spoiledIds.length) {
-    rows.push(['Spoiled overnight', spoiledIds.map((k) => `${game.spoiled[k]}× ${ITEMS[k].name}`).join(', ')]);
+    rows.push([
+      'Spoiled overnight',
+      spoiledIds.map((k) => `${game.spoiled[k]}× ${ITEMS[k].name}`).join(', '),
+    ]);
   }
   for (const [k, v] of rows) {
     const li = document.createElement('li');
@@ -416,6 +504,8 @@ function renderEvening() {
   }
 
   renderOrders();
+  renderJournal($('#evening-journal'));
+  renderGuild();
 
   const list = $('#upgrade-list');
   list.textContent = '';
@@ -464,6 +554,105 @@ function renderEvening() {
   }
 }
 
+function renderJournal(container) {
+  container.textContent = '';
+  const season = seasonAt(game.day),
+    p = game.progress;
+  const title = document.createElement('h3');
+  title.className = 'journal-heading';
+  title.textContent = `${season.name} · Year ${season.year}`;
+  const sub = document.createElement('p');
+  sub.className = 'panel-note';
+  sub.textContent = `${season.subtitle} · ${season.left} days left · ${p.stamps} guild stamps`;
+  const event = document.createElement('p');
+  event.className = 'journal-event';
+  event.textContent = `${game.event.name} — ${game.event.text}`;
+  const demand = document.createElement('p');
+  demand.className = 'panel-note';
+  demand.textContent = `Season favourites (+18%): ${season.goods.map((id) => ITEMS[id].name).join(', ')}.`;
+  container.append(title, sub, event, demand);
+  const list = document.createElement('ul');
+  list.className = 'goal-list';
+  for (const goal of seasonGoals(p)) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = `${goal.done ? '✓ ' : ''}${goal.name}`;
+    const value = document.createElement('b');
+    value.textContent = `${goal.value}/${goal.target}`;
+    const bar = document.createElement('progress');
+    bar.max = goal.target;
+    bar.value = goal.value;
+    bar.setAttribute('aria-label', goal.name);
+    const reward = document.createElement('small');
+    reward.textContent = goal.done
+      ? 'Reward collected'
+      : `+${goal.reward} coin · +1 stamp`;
+    li.append(label, value, bar, reward);
+    list.append(li);
+  }
+  container.append(list);
+  for (const text of game.progressNews || []) {
+    const news = document.createElement('p');
+    news.className = 'journal-news';
+    news.textContent = text;
+    container.append(news);
+  }
+  const details = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = `Maker’s collection · ${Object.keys(p.made).length}/8 recipes · ${p.badges.length}/${BADGES.length} badges`;
+  details.append(summary);
+  for (const badge of BADGES) {
+    const line = document.createElement('p');
+    line.className = 'collection-line';
+    line.textContent = `${p.badges.includes(badge.id) ? '★' : '☆'} ${badge.name} — ${badge.text} (${Math.min(badge.target, badge.goal(p))}/${badge.target})`;
+    details.append(line);
+  }
+  const collection = document.createElement('div');
+  collection.className = 'collection-grid';
+  for (const id of Object.keys(RECIPES)) {
+    const tile = document.createElement('div');
+    tile.className = p.made[id] ? 'collected' : 'uncollected';
+    const text = document.createElement('span');
+    text.textContent = `${ITEMS[id].name} · ${p.made[id] || 0} made`;
+    tile.append(icon(id), text);
+    collection.append(tile);
+  }
+  details.append(collection);
+  container.append(details);
+}
+
+function renderGuild() {
+  const list = $('#guild-list');
+  list.textContent = '';
+  for (const spec of SPECIALISATIONS) {
+    const next = specialisation(game.upgrades, spec.id);
+    const li = document.createElement('li');
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    const name = document.createElement('b');
+    name.textContent = `${spec.name} · ${next.level}/5`;
+    const desc = document.createElement('span');
+    desc.textContent = spec.text;
+    nm.append(name, desc);
+    li.append(nm);
+    const btn = document.createElement('button');
+    btn.className = 'mini guild-buy';
+    btn.type = 'button';
+    btn.textContent = next.max
+      ? 'Mastered'
+      : `${next.gold}c · ${next.stamps} stamps`;
+    btn.setAttribute('aria-label', `Upgrade ${spec.name}: ${btn.textContent}`);
+    btn.disabled =
+      next.max ||
+      game.day <= DAYS_TARGET ||
+      game.gold - rentDue(game.day) < next.gold ||
+      game.progress.stamps < next.stamps;
+    btn.addEventListener('click', () => game.buySpecialisation(spec.id));
+    li.append(btn);
+    list.append(li);
+  }
+}
+
 /* Commissions: what settled on the way in, what is still owed, and the one on
  * the table for tomorrow. */
 function renderOrders() {
@@ -489,7 +678,11 @@ function renderOrders() {
     const sp = document.createElement('span');
     const left = o.due - game.day;
     sp.textContent = `${Math.min(have, o.qty)}/${o.qty} gathered · ${
-      left <= 0 ? 'due tomorrow' : `${left} day${left > 1 ? 's' : ''} left`
+      left < 0
+        ? 'overdue'
+        : left === 0
+          ? 'deadline passed tonight'
+          : `${left} day${left > 1 ? 's' : ''} left`
     } · pays ${o.pay}`;
     if (left <= 0) sp.className = 'cold';
     nm.append(b, sp);
@@ -538,14 +731,25 @@ $('#btn-sleep').addEventListener('click', () => {
   game.sleep();
 });
 
-game.on('save', () => store.set(SAVE_KEY, game.snapshot()));
+function saveGame() {
+  if (
+    ['forage', 'craft', 'shop', 'serving', 'evening'].includes(game.phase) ||
+    (game.phase === 'over' && game.won)
+  )
+    return store.set(SAVE_KEY, game.snapshot());
+}
+game.on('save', saveGame);
+setInterval(() => {
+  if (game.phase === 'forage' && !paused) saveGame();
+}, 3000);
+window.addEventListener('pagehide', saveGame);
 
 /* ------------------------------------------------------------------- over -- */
 
 let nameSaved = false;
 
 game.on('gameover', (r) => {
-  store.del(SAVE_KEY);
+  if (!r.canContinue) store.del(SAVE_KEY);
   const best = store.get(BEST_KEY, { score: 0, day: 0 });
   const isBest = r.score > best.score;
   if (isBest) store.set(BEST_KEY, { score: r.score, day: r.day });
@@ -554,12 +758,20 @@ game.on('gameover', (r) => {
   $('#name-input').value = traderName.get();
   $('#btn-save-name').textContent = 'Save';
 
-  $('#over-title').textContent = r.won ? 'You kept the shop' : isBest ? 'Best run yet' : 'Shop closed';
+  $('#over-title').textContent = r.won
+    ? 'You kept the shop'
+    : isBest
+      ? 'Best run yet'
+      : 'Shop closed';
   $('#over-reason').textContent = r.reason;
   $('#over-score').textContent = r.score.toLocaleString('en-US');
-  $('#over-days').textContent = `${r.day} of ${DAYS_TARGET}`;
+  $('#over-days').textContent = r.shopDay || r.day;
+  $('#over-total').textContent = (r.total ?? r.score).toLocaleString('en-US');
+  show($('#btn-career'), !!r.canContinue);
   $('#over-sold').textContent = r.sold;
-  $('#over-best').textContent = store.get(BEST_KEY, { score: 0 }).score.toLocaleString('en-US');
+  $('#over-best').textContent = store
+    .get(BEST_KEY, { score: 0 })
+    .score.toLocaleString('en-US');
   showOnly('over');
 });
 
@@ -571,7 +783,11 @@ $('#name-input').addEventListener('blur', saveName);
 
 function saveName() {
   if (nameSaved) return;
-  const clean = $('#name-input').value.toUpperCase().replace(/[^A-Z0-9 .\-_]/g, '').trim().slice(0, 12);
+  const clean = $('#name-input')
+    .value.toUpperCase()
+    .replace(/[^A-Z0-9 .\-_]/g, '')
+    .trim()
+    .slice(0, 12);
   if (!clean) return;
   traderName.set(clean);
   nameSaved = true;
@@ -624,15 +840,27 @@ canvas.addEventListener('pointerup', dropStick);
 canvas.addEventListener('pointercancel', dropStick);
 
 const KEYMAP = {
-  ArrowLeft: 'left', a: 'left', A: 'left',
-  ArrowRight: 'right', d: 'right', D: 'right',
-  ArrowUp: 'up', w: 'up', W: 'up',
-  ArrowDown: 'down', s: 'down', S: 'down',
+  ArrowLeft: 'left',
+  a: 'left',
+  A: 'left',
+  ArrowRight: 'right',
+  d: 'right',
+  D: 'right',
+  ArrowUp: 'up',
+  w: 'up',
+  W: 'up',
+  ArrowDown: 'down',
+  s: 'down',
+  S: 'down',
 };
 
 window.addEventListener('keydown', (e) => {
   if (isEditing(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.repeat && ['p', 'P', 'Escape'].includes(e.key)) return;
+  if (e.repeat && ['p', 'P', 'Escape', 'h', 'H'].includes(e.key)) return;
+  if (['h', 'H'].includes(e.key) && game.phase === 'forage' && !paused) {
+    game.goHome('You head home to the workbench.');
+    return;
+  }
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
     e.preventDefault();
     togglePause();
@@ -660,12 +888,14 @@ function togglePause() {
   show(SCREENS.pause, paused);
   show(hudEl, !paused);
   if (paused) {
-    for (const key of ['left','right','up','down']) game.key(key, false);
+    renderJournal($('#pause-journal'));
+    saveGame();
+    for (const key of ['left', 'right', 'up', 'down']) game.key(key, false);
     game.setStick(null);
-    stickId = null; stickOrigin = null;
+    stickId = null;
+    stickOrigin = null;
     game.stop();
-  }
-  else game.start();
+  } else game.start();
   sfx.ui();
 }
 
@@ -673,12 +903,21 @@ $('#btn-pause').addEventListener('click', (e) => {
   e.stopPropagation();
   togglePause();
 });
+$('#btn-journal').addEventListener('click', () => togglePause());
+$('#obj-home').addEventListener('click', () => {
+  if (!paused) game.goHome('You head home to the workbench.');
+});
+$('#btn-career').addEventListener('click', () => game.continueShop());
 $('#btn-resume').addEventListener('click', () => togglePause());
 $('#btn-quit').addEventListener('click', () => {
   paused = false;
   game.stop();
-  // Keep the existing start-of-day checkpoint; mid-day inventory must not
-  // be restored into a fresh forest with replenished stamina and resources.
+  if (saveGame() === false) {
+    paused = true;
+    return;
+  }
+  show(objEl, false);
+  show(coachEl, false);
   game.phase = 'menu';
   showOnly('menu');
   refreshMenu();
@@ -690,7 +929,7 @@ $('#btn-quit').addEventListener('click', () => {
     setSound(!soundOn());
     syncSoundButtons();
     sfx.ui();
-  })
+  }),
 );
 
 /* ------------------------------------------------------------------- boot -- */
@@ -698,7 +937,12 @@ $('#btn-quit').addEventListener('click', () => {
 $('#btn-start').addEventListener('click', () => {
   unlock();
   sfx.ui();
-  store.del(SAVE_KEY);
+  if (store.get(SAVE_KEY, null) && $('#btn-start').dataset.confirm !== 'yes') {
+    $('#btn-start').dataset.confirm = 'yes';
+    $('#btn-start').textContent = 'Replace saved shop?';
+    return;
+  }
+  delete $('#btn-start').dataset.confirm;
   game.newRun();
 });
 
@@ -712,7 +956,10 @@ $('#btn-continue').addEventListener('click', () => {
   unlock();
   sfx.ui();
   const saved = store.get(SAVE_KEY, null);
-  if (!saved || !game.restore(saved)) game.newRun();
+  if (!saved || !game.restore(saved)) {
+    $('#menu-best').textContent =
+      'This save could not be read. Your saved data is still here; you can choose to open a new shop.';
+  }
 });
 
 function refreshMenu() {
@@ -724,6 +971,8 @@ function refreshMenu() {
     : 'No shop yet';
   const saved = store.get(SAVE_KEY, null);
   show($('#btn-continue'), !!saved);
+  delete $('#btn-start').dataset.confirm;
+  $('#btn-start').textContent = saved ? 'Start a new shop' : 'Open the shop';
   if (saved) $('#btn-continue').textContent = `Continue — day ${saved.day}`;
 }
 
@@ -738,7 +987,10 @@ window.addEventListener('blur', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && game.phase === 'forage' && !paused) togglePause();
+  if (document.hidden) {
+    saveGame();
+    if (game.phase === 'forage' && !paused) togglePause();
+  }
 });
 
 /* The arcade game page's sound button reaches in here. */
@@ -751,7 +1003,7 @@ window.addEventListener('message', (e) => {
 });
 
 ['pointerdown', 'keydown'].forEach((evt) =>
-  window.addEventListener(evt, () => unlock(), { once: true, passive: true })
+  window.addEventListener(evt, () => unlock(), { once: true, passive: true }),
 );
 
 if ('serviceWorker' in navigator) {
@@ -766,5 +1018,10 @@ showOnly('menu');
 game.resize();
 game.start();
 
-attachArcade(game, { slug: 'whittle-wares', title: 'Whittle & Wares', resultSelector: '#screen-over .panel', mode: r => r.difficulty?.id || 'veteran' });
+attachArcade(game, {
+  slug: 'whittle-wares',
+  title: 'Whittle & Wares',
+  resultSelector: '#screen-over .panel',
+  mode: (r) => r.difficulty?.id || 'veteran',
+});
 if (window.parent !== window) document.body.dataset.embedded = '';

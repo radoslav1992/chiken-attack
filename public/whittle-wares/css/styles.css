@@ -76,7 +76,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(10, 16, 12, 0.85), rgba(10, 16, 12, 0));
+  background: linear-gradient(
+    180deg,
+    rgba(10, 16, 12, 0.85),
+    rgba(10, 16, 12, 0)
+  );
   pointer-events: none;
 }
 
@@ -416,23 +420,23 @@ body {
   color: var(--dim);
 }
 
-.verdict[data-tone='cheap'] {
+.verdict[data-tone="cheap"] {
   color: #8fd0ff;
 }
 
-.verdict[data-tone='good'] {
+.verdict[data-tone="good"] {
   color: var(--leaf);
 }
 
-.verdict[data-tone='fair'] {
+.verdict[data-tone="fair"] {
   color: var(--gold);
 }
 
-.verdict[data-tone='dear'] {
+.verdict[data-tone="dear"] {
   color: var(--rust);
 }
 
-.verdict[data-tone='bad'] {
+.verdict[data-tone="bad"] {
   color: var(--red);
 }
 
@@ -627,7 +631,6 @@ body {
   }
 }
 
-
 /* ------------------------------------------------------- forage objective -- */
 
 /* "I have no idea what to do, I only collect some stuff and nothing else" —
@@ -686,7 +689,11 @@ body {
   bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px);
   padding: 11px 13px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(56, 84, 48, 0.96), rgba(30, 48, 28, 0.96));
+  background: linear-gradient(
+    180deg,
+    rgba(56, 84, 48, 0.96),
+    rgba(30, 48, 28, 0.96)
+  );
   border: 1px solid rgba(238, 243, 228, 0.22);
   font-size: 13px;
   line-height: 1.45;
@@ -697,7 +704,6 @@ body {
 .coach b {
   color: var(--gold);
 }
-
 
 /* ---------------------------------------------------------- commissions -- */
 
@@ -789,4 +795,296 @@ body {
   margin: 0 0 4px;
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* A woodland ledger: warm paper, ink, moss and brass. */
+body[data-arcade="whittle-wares"] .panel {
+  --ink: #302b22;
+  --dim: #70634f;
+  --line: #6c513b30;
+  --gold: #935623;
+  --leaf: #326647;
+  --red: #a2392c;
+  color: var(--ink);
+  width: min(580px, 100%);
+  background: linear-gradient(135deg, #f5edd9, #e7dbc0) !important;
+  border: 1px solid #c3aa7c !important;
+  border-radius: 4px 22px 22px 4px !important;
+  box-shadow:
+    inset 5px 0 #98794b55,
+    0 24px 80px #0008 !important;
+  padding: 24px;
+}
+body[data-arcade="whittle-wares"] .panel-title {
+  background:
+    radial-gradient(ellipse at top, #fff8e6, transparent 65%),
+    linear-gradient(135deg, #f5edd9, #e7dbc0) !important;
+}
+body[data-arcade="whittle-wares"] .title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: clamp(32px, 7vw, 54px);
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+  margin: 16px 0;
+  text-transform: none;
+}
+.eyebrow {
+  color: #79603f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.season-preview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-block: 1px solid #98794b44;
+  padding: 12px 0;
+  margin: 20px 0;
+  gap: 5px;
+}
+.season-preview span {
+  font-size: 11px;
+  color: #6b553c;
+}
+body[data-arcade="whittle-wares"] .btn-primary {
+  background: #28583f !important;
+  border-color: #28583f !important;
+  color: #fff7e4 !important;
+}
+body[data-arcade="whittle-wares"] .btn-ghost {
+  color: #51402d;
+  border-color: #90764f55;
+  background: #fffaf04d;
+}
+body[data-arcade="whittle-wares"] .mini {
+  background: #fffcf080;
+  color: #3f5638;
+  border-color: #89755566;
+  min-height: 40px;
+}
+body[data-arcade="whittle-wares"] .mini:disabled {
+  opacity: 0.45;
+}
+body[data-arcade="whittle-wares"] .list li {
+  border-color: #927b5140;
+}
+body[data-arcade="whittle-wares"] .list li.is-owned {
+  opacity: 0.6;
+}
+body[data-arcade="whittle-wares"] .panel-h,
+.journal-heading {
+  font-family: Georgia, serif;
+  letter-spacing: -0.02em;
+  font-size: 25px;
+  text-transform: none;
+}
+body[data-arcade="whittle-wares"] .hot,
+body[data-arcade="whittle-wares"] .is-good {
+  color: #2d6543;
+}
+body[data-arcade="whittle-wares"] .cold,
+body[data-arcade="whittle-wares"] .is-bad {
+  color: #9e382b;
+}
+body[data-arcade="whittle-wares"] .offer {
+  background: #b4c39d40;
+  border-color: #72936866;
+}
+body[data-arcade="whittle-wares"] .rent {
+  background: #dfb46c35;
+  border: 1px solid #ae7a3755;
+  padding: 12px;
+  border-radius: 8px;
+}
+body[data-arcade="whittle-wares"] .arcade-result-summary,
+body[data-arcade="whittle-wares"] .arcade-score-status,
+body[data-arcade="whittle-wares"] .arcade-share-status {
+  color: #63543d;
+}
+body[data-arcade="whittle-wares"] .name-input {
+  background: #fff8e9;
+  color: #302b22;
+  border-color: #967c53;
+}
+.journal-btn {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11px;
+}
+button.obj-home {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid #b4d6a64d;
+  color: #dbebbc;
+  font: inherit;
+  min-height: 40px;
+}
+.journal {
+  margin-block: 18px;
+  padding: 16px;
+  background: #fffcf05c;
+  border: 1px solid #94775040;
+  border-radius: 12px;
+}
+.journal-heading {
+  margin: 0 0 6px;
+}
+.journal-event {
+  background: #becba43d;
+  padding: 10px;
+  border-left: 3px solid #6e8a52;
+  font-size: 12px;
+}
+.goal-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 14px;
+}
+.goal-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  font-size: 12px;
+}
+.goal-list b {
+  font-variant-numeric: tabular-nums;
+  color: #31573b;
+}
+.goal-list progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 7px;
+  border: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  accent-color: #50764a;
+}
+.goal-list progress::-webkit-progress-bar {
+  background: #e0d5bb;
+}
+.goal-list progress::-webkit-progress-value {
+  background: #50764a;
+  border-radius: 5px;
+}
+.goal-list small {
+  color: #796344;
+}
+.journal-news {
+  font-size: 12px;
+  font-weight: bold;
+  color: #31573b;
+}
+.journal details {
+  margin-top: 18px;
+  border-top: 1px solid #94775040;
+  padding-top: 14px;
+}
+.journal summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  min-height: 32px;
+}
+.collection-line {
+  font-size: 11px;
+  margin: 8px 0;
+}
+.collection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.collection-grid > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #fdf7e9;
+  border-radius: 8px;
+  font-size: 10px;
+}
+.collection-grid .uncollected {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.batch,
+.guild-buy {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.guild-buy {
+  max-width: 116px;
+}
+.price-presets {
+  gap: 6px;
+}
+.price-presets .btn {
+  flex: 1;
+  width: auto;
+  font-size: 11px;
+  padding: 8px;
+}
+.save-warning {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  background: #853e27;
+  color: white;
+  padding: 12px;
+  z-index: 100;
+  font: 13px/1.4 system-ui;
+}
+body[data-arcade="whittle-wares"] :focus-visible {
+  outline: 3px solid #a96827;
+  outline-offset: 3px;
+}
+@media (max-width: 440px) {
+  body[data-arcade="whittle-wares"] .panel {
+    padding: 18px 14px;
+  }
+  .screen {
+    padding: 9px;
+  }
+  .journal {
+    padding: 12px;
+  }
+  .hud-day {
+    font-size: 12px;
+  }
+  .hud-row {
+    gap: 6px;
+  }
+  .list .nm b {
+    font-size: 12px;
+  }
+  .list .nm span {
+    font-size: 10px;
+  }
+  .batch {
+    padding: 4px 7px;
+  }
+  .collection-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.evening-section {
+  border-top: 1px solid #94775040;
+  margin-top: 16px;
+  padding-top: 10px;
+}
+.evening-section > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #37533b;
 }

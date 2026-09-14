@@ -13,15 +13,66 @@
  */
 
 import {
-  makeRng, ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, ZONES, zoneOpen,
-  rentDue, RENT_EVERY, dailyMarket, customerCount, makeCustomer, evaluateOffer,
-  repDelta, suggestedPrice, priceOutlook, priceCeiling, priceLabel,
-  stockCapacity, maxStamina, nodeYield, canCraft, spoil, countStock,
-  openRecipes, makeOrder, orderSlots, orderFillable, ORDER_REP,
+  makeRng,
+  ITEMS,
+  RECIPES,
+  UPGRADES,
+  UPGRADE_BY_ID,
+  ZONES,
+  zoneOpen,
+  rentDue,
+  RENT_EVERY,
+  dailyMarket,
+  customerCount,
+  makeCustomer,
+  evaluateOffer,
+  repDelta,
+  suggestedPrice,
+  priceOutlook,
+  priceCeiling,
+  priceLabel,
+  stockCapacity,
+  maxStamina,
+  nodeYield,
+  canCraft,
+  spoil,
+  countStock,
+  openRecipes,
+  makeOrder,
+  orderSlots,
+  orderFillable,
+  ORDER_REP,
 } from './economy.js';
-import { generate, reachable, solid, TILE, MAP_W, MAP_H, T, bandOfRow } from './world.js';
-import { beaverFrame, waspSprite, tileArt, nodeSprite, blit, PAL } from './art.js';
+import {
+  generate,
+  reachable,
+  solid,
+  TILE,
+  MAP_W,
+  MAP_H,
+  T,
+  bandOfRow,
+} from './world.js';
+import {
+  beaverFrame,
+  waspSprite,
+  tileArt,
+  nodeSprite,
+  blit,
+  PAL,
+} from './art.js';
 import { sfx } from './audio.js';
+import {
+  newProgress,
+  beginSeason,
+  claimProgress,
+  seasonAt,
+  eventAt,
+  seasonalMarket,
+  specialisation,
+  SPECIALISATIONS,
+} from './progression.js';
+import { snapshot, validSave, SAVE_FIELDS } from './save.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -49,7 +100,9 @@ export class Game {
     this._last = 0;
     this.keys = new Set();
     this.stick = null;
-    this.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.reduceMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
     /* The loop starts at boot, on the menu, before any run exists — so these
      * have to be real from the constructor. Left undefined they threw once a
      * frame behind the title screen, which nothing on screen would ever show. */
@@ -95,6 +148,16 @@ export class Game {
   /* ------------------------------------------------------------------ run -- */
 
   newRun(seed) {
+    clearTimeout(this._customerTimer);
+    this.keys.clear();
+    this.stick = null;
+    this.progress = newProgress();
+    this.progressNews = [];
+    this.rankedScore = null;
+    this.scoreId =
+      globalThis.crypto?.randomUUID?.() ||
+      `wares-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+    this.won = false;
     this.seed = (seed || Math.floor(Math.random() * 1e9)) >>> 0;
     this.day = 0;
     this.gold = 60;
@@ -117,18 +180,47 @@ export class Game {
   }
 
   snapshot() {
-    return {
-      v: 1,
-      seed: this.seed, day: this.day, gold: this.gold, rep: this.rep,
-      inv: this.inv, ages: this.ages, upgrades: this.upgrades, prices: this.prices,
-      takings: this.takings, sold: this.sold, walkouts: this.walkouts,
-      orders: this.orders, offer: this.offer,
-      ordersDone: this.ordersDone, ordersFailed: this.ordersFailed,
-    };
+    return snapshot(this);
   }
 
   restore(s) {
-    if (!s || s.v !== 1) return false;
+    if (!validSave(s)) return false;
+    s = JSON.parse(JSON.stringify(s));
+    clearTimeout(this._customerTimer);
+    this.keys.clear();
+    this.stick = null;
+    this.floats = [];
+    this.animT = 0;
+    this.gatherT = 0;
+    this.gatherTarget = null;
+    if (s.v === 2) {
+      for (const key of SAVE_FIELDS) this[key] = s[key];
+      this.map = { ...s.map, tiles: Uint8Array.from(s.map.tiles) };
+      this.reach = reachable(this.map, this.upgrades);
+      this.rng = makeRng(1);
+      this.rng.restore(s.rngState);
+      this.event = eventAt(this.day);
+      if (this.phase === 'over') this.gameOver(this.won);
+      else {
+        this.emit('phase', this.phase);
+        this.emit('hud');
+        if (this.phase === 'serving') {
+          this.emit(
+            'customer',
+            this.customer,
+            this.customerView.what,
+            this.customerView.deal,
+          );
+          if (!this.awaitingHaggle) this.scheduleCustomer();
+        }
+      }
+      return true;
+    }
+    this.progress = newProgress();
+    this.progressNews = [];
+    this.rankedScore = null;
+    this.won = false;
+    this.scoreId = `wares-legacy-${s.seed}-${Date.now()}`;
     this.seed = s.seed;
     this.day = s.day - 1; // startDay steps it forward
     this.gold = s.gold;
@@ -153,9 +245,19 @@ export class Game {
   /* ------------------------------------------------------------- the day -- */
 
   startDay() {
+    clearTimeout(this._customerTimer);
+    this.keys.clear();
+    this.stick = null;
     this.day++;
+    beginSeason(this.progress, this.day);
+    this.progressNews = [];
+    this.event = eventAt(this.day);
     this.rng = makeRng(this.seed * 2654435761 + this.day * 40503);
-    this.market = dailyMarket(this.day, this.rng);
+    this.market = seasonalMarket(
+      dailyMarket(this.day, this.rng, this.upgrades),
+      this.day,
+      this.upgrades,
+    );
     this.map = generate(this.day, this.upgrades, this.rng);
     this.reach = reachable(this.map, this.upgrades);
 
@@ -182,14 +284,11 @@ export class Game {
     this.hintT = 0;
 
     this.phase = 'forage';
-    /* Saved at the START of the day, so the snapshot means "the day you are
-     * about to play". Saved at the end of sleep() it meant the day just
-     * finished, and restoring rewound the player by one day and one lot of
-     * takings. */
+    // v2 checkpoints preserve the forest and each management phase exactly.
     this.emit('save');
     this.emit('phase', 'forage');
     this.emit('hud');
-    this.say(`Day ${this.day} — ${this.market.hot.map((h) => ITEMS[h].name).join(' and ')} are wanted today`, 3.4);
+    this.say(`${seasonAt(this.day).name} · ${this.event.name}`, 3.4);
     sfx.day();
   }
 
@@ -209,7 +308,12 @@ export class Game {
   homeInfo() {
     const dx = this.map.spawn.x * TILE + TILE / 2 - this.px;
     const dy = (this.map.spawn.y + 1) * TILE + TILE / 2 - this.py;
-    return { dx, dy, paces: Math.round(Math.hypot(dx, dy) / TILE), angle: Math.atan2(dy, dx) };
+    return {
+      dx,
+      dy,
+      paces: Math.round(Math.hypot(dx, dy) / TILE),
+      angle: Math.atan2(dy, dx),
+    };
   }
 
   /** The one-line objective, always on screen while foraging. */
@@ -226,7 +330,8 @@ export class Game {
       const have = this.inv[order.item] || 0;
       const left = Math.max(0, order.qty - have);
       const days = order.due - this.day;
-      if (!left) return `Order filled — <b>take it home</b> for ${order.pay} coin.`;
+      if (!left)
+        return `Order filled — <b>take it home</b> for ${order.pay} coin.`;
       return `Order: <b>${left} more ${ITEMS[order.item].name}</b> · ${days === 0 ? 'due today' : `${days} day${days > 1 ? 's' : ''} left`}`;
     }
     if (!sack) return 'Walk onto a plant to gather it.';
@@ -249,9 +354,11 @@ export class Game {
   coach() {
     if (this.coachDone) return null;
     if (this.day > 1) return null;
-    if (this.gathered === 0) return 'Drag anywhere to walk. Stand on a plant and it comes up on its own — there is no button.';
-    if (this.gathered < 3) return 'The green bar is your stamina. Walking spends it as well as gathering, and when it runs out you are carried home.';
-    return 'That is a morning\'s work. Walk back to the <b>shop door</b> at the bottom — whatever is in the satchel is what you sell tonight.';
+    if (this.gathered === 0)
+      return 'Drag anywhere to walk. Stand on a plant and it comes up on its own — there is no button.';
+    if (this.gathered < 3)
+      return 'The green bar is your stamina. Walking spends it as well as gathering, and when it runs out you are carried home.';
+    return "That is a morning's work. Walk back to the <b>shop door</b> at the bottom — whatever is in the satchel is what you sell tonight.";
   }
 
   /* ------------------------------------------------------------ the loop -- */
@@ -321,8 +428,12 @@ export class Game {
       this.stun -= dt;
     } else {
       const w = this.wish();
-      this.vx = w.x * SPEED;
-      this.vy = w.y * SPEED;
+      const speed =
+        SPEED *
+        (this.event.speed || 1) *
+        (1 + specialisation(this.upgrades, 'trail').level * 0.05);
+      this.vx = w.x * speed;
+      this.vy = w.y * speed;
       if (w.len > 0.05) {
         this.moveBy(this.vx * dt, this.vy * dt);
         this.stamina -= MOVE_DRAIN * dt * w.len;
@@ -367,15 +478,22 @@ export class Game {
   }
 
   blocked(x, y) {
-    for (const [ox, oy] of [[-BODY, -BODY], [BODY, -BODY], [-BODY, BODY], [BODY, BODY]]) {
+    for (const [ox, oy] of [
+      [-BODY, -BODY],
+      [BODY, -BODY],
+      [-BODY, BODY],
+      [BODY, BODY],
+    ]) {
       const tx = Math.floor((x + ox) / TILE);
       const ty = Math.floor((y + oy) / TILE);
       if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
       const code = this.map.tiles[ty * MAP_W + tx];
       if (solid(code, this.upgrades)) {
         // A locked gate says why, once, instead of feeling like a bug.
-        if (code === T.gateAxe && this.hintT <= 0) this.say('Brambles. A steel axe would cut these.');
-        if (code === T.gateLantern && this.hintT <= 0) this.say('Too dark to go on. You would need a lantern.');
+        if (code === T.gateAxe && this.hintT <= 0)
+          this.say('Brambles. A steel axe would cut these.');
+        if (code === T.gateLantern && this.hintT <= 0)
+          this.say('Too dark to go on. You would need a lantern.');
         return true;
       }
     }
@@ -386,8 +504,11 @@ export class Game {
     let near = null;
     let bestD = 14;
     for (const n of this.map.nodes) {
-      if (n.taken) continue;
-      const d = Math.hypot(this.px - (n.x * TILE + TILE / 2), this.py - (n.y * TILE + TILE / 2));
+      if (n.taken || !this.reach[n.y * MAP_W + n.x]) continue;
+      const d = Math.hypot(
+        this.px - (n.x * TILE + TILE / 2),
+        this.py - (n.y * TILE + TILE / 2),
+      );
       if (d < bestD) {
         bestD = d;
         near = n;
@@ -408,9 +529,17 @@ export class Game {
     this.gatherT = 0;
     near.taken = true;
     this.stamina -= GATHER_COST;
-    const n = nodeYield(this.upgrades, this.rng);
+    const n =
+      nodeYield(this.upgrades, this.rng) +
+      (this.event.bounty && ['bark', 'berry', 'resin'].includes(near.item)
+        ? 1
+        : 0);
+    if (!this.inv[near.item]) this.ages[near.item] = 0;
     this.inv[near.item] = (this.inv[near.item] || 0) + n;
     this.gathered += n;
+    this.progress.gathered += n;
+    this.progress.found[near.item] = (this.progress.found[near.item] || 0) + n;
+    this.rewardProgress();
     this.floats.push({
       x: near.x * TILE + TILE / 2,
       y: near.y * TILE,
@@ -427,10 +556,22 @@ export class Game {
       if (h.zone !== near.zone) continue;
       const d = Math.hypot(near.x - h.x, near.y - h.y) * TILE;
       if (d < WASP_RANGE * 1.6 && this.wasps.length < 8) {
-        this.wasps.push({ x: h.x * TILE + 8, y: h.y * TILE + 8, life: 4.5, cool: 0 });
+        this.wasps.push({
+          x: h.x * TILE + 8,
+          y: h.y * TILE + 8,
+          life: 4.5,
+          cool: 0,
+        });
         sfx.sting();
       }
     }
+  }
+
+  rewardProgress() {
+    const reward = claimProgress(this.progress);
+    this.gold += reward.gold;
+    this.progressNews = this.progressNews.concat(reward.news).slice(-12);
+    if (reward.news.length) this.say(reward.news[0], 4);
   }
 
   stepWasps(dt) {
@@ -447,7 +588,13 @@ export class Game {
         w.cool = 1.2;
         this.stamina -= STING_COST;
         this.stun = 0.45;
-        this.floats.push({ x: this.px, y: this.py - 10, text: `−${STING_COST}`, colour: '#ff6b5b', life: 0.9 });
+        this.floats.push({
+          x: this.px,
+          y: this.py - 10,
+          text: `−${STING_COST}`,
+          colour: '#ff6b5b',
+          life: 0.9,
+        });
         sfx.sting();
       }
       if (w.life <= 0) this.wasps.splice(i, 1);
@@ -456,11 +603,15 @@ export class Game {
 
   /** End the morning wherever the player is. */
   goHome(reason) {
+    if (this.phase !== 'forage') return;
+    this.keys.clear();
+    this.stick = null;
     this.coachDone = true;
     this.wasps.length = 0;
     // Everyone has a bench now, so the craft step is always part of the day.
     this.phase = 'craft';
     this.emit('phase', 'craft', reason);
+    this.emit('save');
     this.emit('hud');
   }
 
@@ -474,21 +625,30 @@ export class Game {
     this.orderNews = [];
     for (let i = this.orders.length - 1; i >= 0; i--) {
       const o = this.orders[i];
-      if (orderFillable(o, this.inv)) {
+      if (this.day <= o.due && orderFillable(o, this.inv)) {
         this.inv[o.item] -= o.qty;
         this.gold += o.pay;
         this.takings += o.pay;
         this.dayTakings += o.pay;
         this.rep = clamp(this.rep + ORDER_REP.done, -60, 120);
         this.ordersDone++;
+        this.progress.orders++;
+        this.progress.revenue += o.pay;
+        this.rewardProgress();
         this.orders.splice(i, 1);
-        this.orderNews.push({ ok: true, text: `${o.from} paid ${o.pay} coin for ${o.qty}× ${ITEMS[o.item].name}.` });
+        this.orderNews.push({
+          ok: true,
+          text: `${o.from} paid ${o.pay} coin for ${o.qty}× ${ITEMS[o.item].name}.`,
+        });
         sfx.buy();
       } else if (this.day > o.due) {
         this.rep = clamp(this.rep + ORDER_REP.failed, -60, 120);
         this.ordersFailed++;
         this.orders.splice(i, 1);
-        this.orderNews.push({ ok: false, text: `${o.from} gave up waiting for ${o.qty}× ${ITEMS[o.item].name}.` });
+        this.orderNews.push({
+          ok: false,
+          text: `${o.from} gave up waiting for ${o.qty}× ${ITEMS[o.item].name}.`,
+        });
         sfx.walkout();
       }
     }
@@ -498,11 +658,16 @@ export class Game {
   drawOffer() {
     if (this.offer) return;
     if (this.orders.length >= orderSlots(this.rep)) return;
-    this.offer = makeOrder(this.day + 1, this.rng, this.upgrades, this.orders.length);
+    this.offer = makeOrder(
+      this.day + 1,
+      this.rng,
+      this.upgrades,
+      this.orders.length,
+    );
   }
 
   takeOffer(accept) {
-    if (!this.offer) return;
+    if (this.phase !== 'evening' || !this.offer) return;
     if (accept) {
       this.orders.push(this.offer);
       sfx.coin();
@@ -510,6 +675,7 @@ export class Game {
       sfx.ui();
     }
     this.offer = null;
+    this.emit('save');
     this.emit('evening');
   }
 
@@ -520,19 +686,38 @@ export class Game {
   }
 
   craftable() {
-    return this.recipeBook().filter((id) => canCraft(this.inv, id, this.upgrades));
+    return this.recipeBook().filter((id) =>
+      canCraft(this.inv, id, this.upgrades),
+    );
   }
 
-  craft(id) {
-    if (!canCraft(this.inv, id, this.upgrades)) return false;
-    for (const k in RECIPES[id]) this.inv[k] -= RECIPES[id][k];
-    this.inv[id] = (this.inv[id] || 0) + 1;
+  craft(id, quantity = 1) {
+    if (this.phase !== 'craft' || !canCraft(this.inv, id, this.upgrades))
+      return false;
+    const amount = Math.max(
+      1,
+      Math.min(
+        1000,
+        Math.floor(quantity) || 1,
+        ...Object.entries(RECIPES[id]).map(([k, n]) =>
+          Math.floor(this.inv[k] / n),
+        ),
+      ),
+    );
+    for (const k in RECIPES[id]) this.inv[k] -= RECIPES[id][k] * amount;
+    if (!this.inv[id]) this.ages[id] = 0;
+    this.inv[id] = (this.inv[id] || 0) + amount;
+    this.progress.crafted += amount;
+    this.progress.made[id] = (this.progress.made[id] || 0) + amount;
+    this.rewardProgress();
+    this.emit('save');
     sfx.craft();
     this.emit('hud');
     return true;
   }
 
   doneCrafting() {
+    if (this.phase !== 'craft') return;
     /* Order of operations, and it matters: craft, THEN deliver, THEN open up.
      * Delivering before the bench meant a commission for three clay pots could
      * never be filled by pots you made that afternoon — and the shop would then
@@ -543,7 +728,12 @@ export class Game {
     this.settleOrders();
     this.prepareShop();
     this.phase = 'shop';
-    this.emit('phase', 'shop', this.orderNews && this.orderNews.length ? this.orderNews[0].text : '');
+    this.emit(
+      'phase',
+      'shop',
+      this.orderNews && this.orderNews.length ? this.orderNews[0].text : '',
+    );
+    this.emit('save');
   }
 
   /* ------------------------------------------------------------ the shop -- */
@@ -560,7 +750,13 @@ export class Game {
      * and the player would watch a commission lapse holding the exact goods it
      * asked for. */
     const reserved = {};
-    for (const o of this.orders) reserved[o.item] = (reserved[o.item] || 0) + o.qty;
+    for (const o of this.orders) {
+      reserved[o.item] = (reserved[o.item] || 0) + o.qty;
+      const missing = Math.max(0, o.qty - (this.inv[o.item] || 0));
+      for (const [id, qty] of Object.entries(RECIPES[o.item] || {})) {
+        reserved[id] = (reserved[id] || 0) + qty * missing;
+      }
+    }
     const order = Object.keys(this.inv)
       .filter((id) => this.inv[id] > 0)
       .sort((a, b) => ITEMS[b].value - ITEMS[a].value);
@@ -573,7 +769,7 @@ export class Game {
       }
     }
     for (const id in this.shelf) {
-      if (this.prices[id] == null) this.prices[id] = suggestedPrice(id, this.market);
+      this.prices[id] = suggestedPrice(id, this.market);
     }
     this.queue = [];
     this.customer = null;
@@ -582,16 +778,22 @@ export class Game {
   }
 
   setPrice(id, v) {
+    if (this.phase !== 'shop' || !this.shelf[id] || !Number.isFinite(v)) return;
     /* Bounded at both ends. Unbounded, the stepper would happily take a resin
      * worth 10 coin up into the thousands — which is not a strategy, it is a
      * broken control, and it made the pricing screen feel like it did nothing. */
     const cap = priceCeiling(id, this.market);
     this.prices[id] = Math.max(1, Math.min(cap, Math.round(v)));
     this.emit('shop');
+    this.emit('save');
   }
 
   openShop() {
-    const n = customerCount(this.day, this.rep, this.upgrades, this.rng);
+    if (this.phase !== 'shop') return;
+    this.phase = 'serving';
+    const n =
+      customerCount(this.day, this.rep, this.upgrades, this.rng) +
+      (this.event.customers || 0);
     this.queue = [];
     for (let i = 0; i < n; i++) this.queue.push(i);
     this.shopOpen = true;
@@ -603,7 +805,20 @@ export class Game {
     return Object.keys(this.shelf).filter((id) => this.shelf[id] > 0);
   }
 
+  scheduleCustomer() {
+    clearTimeout(this._customerTimer);
+    this._customerTimer = setTimeout(
+      () => {
+        if (this.phase === 'serving' && !this.awaitingHaggle)
+          this.nextCustomer();
+      },
+      this.fastServe || this.reduceMotion ? 180 : 700,
+    );
+  }
+
   nextCustomer() {
+    clearTimeout(this._customerTimer);
+    if (this.phase !== 'serving') return;
     this.awaitingHaggle = false;
     const stock = this.onShelf();
     if (!this.queue.length || !stock.length) {
@@ -624,7 +839,9 @@ export class Game {
     } else if (verdict === 'haggle') {
       c.haggled = true;
       this.awaitingHaggle = true;
+      this.customerView = { what: 'haggle' };
       this.emit('customer', c, 'haggle');
+      this.emit('save');
     } else {
       this.walkOut();
     }
@@ -640,28 +857,40 @@ export class Game {
     this.takings += total;
     this.daySold += qty;
     this.sold += qty;
+    this.progress.sold += qty;
+    this.progress.revenue += total;
+    this.rewardProgress();
     this.rep = clamp(this.rep + repDelta('buy', c.wants, unitPrice), -60, 120);
     sfx.sale(qty);
     sfx.coin();
-    this.emit('customer', c, 'sold', { qty, unitPrice, total });
+    this.customerView = { what: 'sold', deal: { qty, unitPrice, total } };
+    this.emit('customer', c, 'sold', this.customerView.deal);
+    this.emit('save');
     this.emit('hud');
-    setTimeout(() => this.phase === 'shop' && this.nextCustomer(), this.reduceMotion ? 260 : 760);
+    this.scheduleCustomer();
   }
 
   walkOut() {
     const c = this.customer;
-    this.rep = clamp(this.rep + repDelta('leave', c.wants, this.prices[c.wants]), -60, 120);
+    this.rep = clamp(
+      this.rep + repDelta('leave', c.wants, this.prices[c.wants]),
+      -60,
+      120,
+    );
     this.dayWalkouts++;
     this.walkouts++;
     sfx.walkout();
+    this.customerView = { what: 'left' };
     this.emit('customer', c, 'left');
+    this.emit('save');
     this.emit('hud');
-    setTimeout(() => this.phase === 'shop' && this.nextCustomer(), this.reduceMotion ? 260 : 700);
+    this.scheduleCustomer();
   }
 
   /** Answer a haggle: take their offer, or hold the price and risk the sale. */
   answerHaggle(accept) {
-    if (!this.awaitingHaggle || !this.customer) return;
+    if (this.phase !== 'serving' || !this.awaitingHaggle || !this.customer)
+      return;
     this.awaitingHaggle = false;
     if (accept) {
       this.sell(this.customer.wtp);
@@ -672,9 +901,12 @@ export class Game {
   }
 
   endShop() {
+    if (this.phase !== 'serving') return;
+    clearTimeout(this._customerTimer);
     // Everything unsold goes back in the satchel.
     for (const id in this.shelf) {
-      if (this.shelf[id] > 0) this.inv[id] = (this.inv[id] || 0) + this.shelf[id];
+      if (this.shelf[id] > 0)
+        this.inv[id] = (this.inv[id] || 0) + this.shelf[id];
       this.shelf[id] = 0;
     }
     this.spoiled = spoil(this.inv, this.ages);
@@ -682,6 +914,7 @@ export class Game {
     this.drawOffer();
     this.phase = 'evening';
     this.emit('phase', 'evening');
+    this.emit('save');
     this.emit('hud');
   }
 
@@ -689,21 +922,59 @@ export class Game {
 
   affordable(id) {
     const u = UPGRADE_BY_ID[id];
-    return u && !this.upgrades.includes(id) && this.gold >= u.cost;
+    return (
+      u &&
+      !this.upgrades.includes(id) &&
+      this.gold - rentDue(this.day) >= u.cost
+    );
   }
 
   buyUpgrade(id) {
-    if (!this.affordable(id)) return false;
+    if (this.phase !== 'evening' || !this.affordable(id)) return false;
     this.gold -= UPGRADE_BY_ID[id].cost;
     this.upgrades.push(id);
+    this.emit('save');
     sfx.buy();
     this.emit('hud');
     this.emit('evening');
     return true;
   }
 
-  /** Rent falls at the end of every fifth day. This is the whole clock. */
+  buySpecialisation(id) {
+    if (
+      this.phase !== 'evening' ||
+      this.day <= DAYS_TARGET ||
+      !SPECIALISATIONS.some((s) => s.id === id)
+    )
+      return false;
+    const next = specialisation(this.upgrades, id);
+    if (
+      next.max ||
+      this.gold - rentDue(this.day) < next.gold ||
+      this.progress.stamps < next.stamps
+    )
+      return false;
+    this.gold -= next.gold;
+    this.progress.stamps -= next.stamps;
+    this.upgrades.push(next.next);
+    sfx.buy();
+    this.emit('save');
+    this.emit('evening');
+    this.emit('hud');
+    return true;
+  }
+
+  continueShop() {
+    if (this.phase !== 'over' || !this.won || this.day !== DAYS_TARGET)
+      return false;
+    this.won = false;
+    this.startDay();
+    return true;
+  }
+
+  /** The first thirty days are ranked; the established shop can keep growing. */
   sleep() {
+    if (this.phase !== 'evening') return;
     const rent = rentDue(this.day);
     if (rent) {
       this.gold -= rent;
@@ -714,8 +985,9 @@ export class Game {
         return;
       }
     }
-    if (this.day >= DAYS_TARGET) {
-      this.overReason = `You saw out all ${DAYS_TARGET} days with the shop still yours.`;
+    if (this.day === DAYS_TARGET) {
+      this.rankedScore = Math.round(this.takings);
+      this.overReason = `Your first 30 days are in the ledger. Keep your shop, unlock the guild workshop and see what the next season brings.`;
       this.gameOver(true);
       return;
     }
@@ -726,9 +998,15 @@ export class Game {
     this.phase = 'over';
     this.won = won;
     sfx[won ? 'buy' : 'ruin']();
+    clearTimeout(this._customerTimer);
+    if (won) this.emit('save');
     this.emit('gameover', {
-      score: Math.round(this.takings),
-      day: this.day,
+      id: this.scoreId,
+      score: this.rankedScore ?? Math.round(this.takings),
+      day: Math.min(this.day, DAYS_TARGET),
+      shopDay: this.day,
+      total: this.takings,
+      canContinue: won && this.day === DAYS_TARGET,
       gold: this.gold,
       won,
       reason: this.overReason,
@@ -756,7 +1034,11 @@ export class Game {
      * the shop door — which is the last row — was drawn underneath the strip and
      * simply disappeared at the moment the player most wanted to see it. */
     const BOTTOM_UI = 96 / z;
-    const camY = clamp(this.py - viewH / 2, 0, MAP_H * TILE - viewH + BOTTOM_UI);
+    const camY = clamp(
+      this.py - viewH / 2,
+      0,
+      MAP_H * TILE - viewH + BOTTOM_UI,
+    );
 
     ctx.save();
     ctx.scale(z, z);
@@ -767,27 +1049,55 @@ export class Game {
     const y0 = Math.max(0, Math.floor(camY / TILE));
     const y1 = Math.min(MAP_H - 1, Math.ceil((camY + viewH) / TILE));
 
-    const NAMES = ['grass', 'path', 'flower', 'door', 'tree', 'rock', 'water', 'stump', 'gateAxe', 'gateLantern'];
+    const NAMES = [
+      'grass',
+      'path',
+      'flower',
+      'door',
+      'tree',
+      'rock',
+      'water',
+      'stump',
+      'gateAxe',
+      'gateLantern',
+    ];
     for (let y = y0; y <= y1; y++) {
       const band = bandOfRow(y);
       for (let x = x0; x <= x1; x++) {
         let code = this.map.tiles[y * MAP_W + x];
         // An opened gate is just path — the tool changed the world.
-        if ((code === T.gateAxe || code === T.gateLantern) && !solid(code, this.upgrades)) code = T.path;
-        ctx.drawImage(tileArt(NAMES[code] || 'grass', band), x * TILE, y * TILE);
+        if (
+          (code === T.gateAxe || code === T.gateLantern) &&
+          !solid(code, this.upgrades)
+        )
+          code = T.path;
+        ctx.drawImage(
+          tileArt(NAMES[code] || 'grass', band),
+          x * TILE,
+          y * TILE,
+        );
       }
     }
 
     // Nodes, bobbing gently so they read as pickups rather than scenery.
     for (const n of this.map.nodes) {
       if (n.taken) continue;
-      if (n.x < x0 - 1 || n.x > x1 + 1 || n.y < y0 - 1 || n.y > y1 + 1) continue;
-      const bob = this.reduceMotion ? 0 : Math.sin(this.animT * 0.6 + n.x + n.y) * 0.8;
+      if (n.x < x0 - 1 || n.x > x1 + 1 || n.y < y0 - 1 || n.y > y1 + 1)
+        continue;
+      const bob = this.reduceMotion
+        ? 0
+        : Math.sin(this.animT * 0.6 + n.x + n.y) * 0.8;
       ctx.globalAlpha = 0.35;
       ctx.fillStyle = '#000';
       ctx.fillRect(n.x * TILE + 4, n.y * TILE + 13, 8, 2);
       ctx.globalAlpha = 1;
-      blit(ctx, nodeSprite(n.item, ITEMS[n.item].colour), n.x * TILE + 4, n.y * TILE + 3 + bob, 1);
+      blit(
+        ctx,
+        nodeSprite(n.item, ITEMS[n.item].colour),
+        n.x * TILE + 4,
+        n.y * TILE + 3 + bob,
+        1,
+      );
     }
 
     // The gather ring: a filling arc, so the pause has a reason on screen.
@@ -796,17 +1106,30 @@ export class Game {
       ctx.strokeStyle = '#ffe08a';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(n.x * TILE + 8, n.y * TILE + 8, 9, -Math.PI / 2, -Math.PI / 2 + (this.gatherT / GATHER_TIME) * Math.PI * 2);
+      ctx.arc(
+        n.x * TILE + 8,
+        n.y * TILE + 8,
+        9,
+        -Math.PI / 2,
+        -Math.PI / 2 + (this.gatherT / GATHER_TIME) * Math.PI * 2,
+      );
       ctx.stroke();
     }
 
     // The beaver.
-    const frame = this.animT > 0 ? (Math.floor(this.animT) % 2) : 0;
+    const frame = this.animT > 0 ? Math.floor(this.animT) % 2 : 0;
     ctx.globalAlpha = 0.32;
     ctx.fillStyle = '#000';
     ctx.fillRect(this.px - 6, this.py + 4, 12, 3);
     ctx.globalAlpha = this.stun > 0 && Math.floor(this.stun * 20) % 2 ? 0.4 : 1;
-    blit(ctx, beaverFrame(frame), this.px - 8, this.py - 10, 1, this.facing < 0);
+    blit(
+      ctx,
+      beaverFrame(frame),
+      this.px - 8,
+      this.py - 10,
+      1,
+      this.facing < 0,
+    );
     ctx.globalAlpha = 1;
 
     for (const w of this.wasps) blit(ctx, waspSprite(), w.x - 4, w.y - 4, 1);
@@ -837,7 +1160,9 @@ export class Game {
     ctx.textAlign = 'left';
     ctx.font = '600 13px ui-rounded, system-ui, sans-serif';
     ctx.fillStyle = 'rgba(8,14,10,0.72)';
-    const label = zoneOpen(zone, this.upgrades) ? zone.name : `${zone.name} — locked`;
+    const label = zoneOpen(zone, this.upgrades)
+      ? zone.name
+      : `${zone.name} — locked`;
     const wpx = ctx.measureText(label).width + 18;
     const top = 62 + (window.visualViewport ? 0 : 0);
     ctx.fillRect(10, top, wpx, 26);
@@ -892,6 +1217,18 @@ export class Game {
 }
 
 export {
-  ITEMS, RECIPES, UPGRADES, UPGRADE_BY_ID, ZONES, rentDue, RENT_EVERY,
-  suggestedPrice, priceOutlook, priceCeiling, priceLabel, countStock, stockCapacity, PAL,
+  ITEMS,
+  RECIPES,
+  UPGRADES,
+  UPGRADE_BY_ID,
+  ZONES,
+  rentDue,
+  RENT_EVERY,
+  suggestedPrice,
+  priceOutlook,
+  priceCeiling,
+  priceLabel,
+  countStock,
+  stockCapacity,
+  PAL,
 };
