@@ -1,3 +1,4 @@
+import { attachArcade, challengeFrom, postScore } from '../../shared/arcade.js';
 /*
  * Boot + DOM shell: screen routing, settings, PWA install and the handful of
  * HUD elements that live outside the canvas.
@@ -295,13 +296,7 @@ function submitGlobalScore(result) {
 
 function pushGlobalScore() {
   if (!lastRun) return;
-  fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...lastRun, name: lastName() }),
-  }).catch(() => {
-    /* offline or standalone install — local scores only */
-  });
+  postScore(lastRun, lastName());
 }
 
 /* -------------------------------------------------------------- game over -- */
@@ -480,8 +475,18 @@ if ('serviceWorker' in navigator) {
 measureSafeArea();
 game.resize();
 syncSettingsUi();
+const challenge = challengeFrom(location.search);
+if (challenge) settings.set('difficulty', challenge.mode);
 syncDifficultyUi();
 syncContinueUi();
 renderBest();
 show('menu');
 game.startAttract();
+
+attachArcade(game, { slug: 'chicken-attack', title: 'Chicken Attack', resultSelector: '#screen-gameover .sheet', mode: r => r.difficulty?.id || 'veteran' });
+if (window.parent !== window) document.body.dataset.embedded = '';
+
+window.addEventListener('blur', () => {
+  if (['playing','wave-intro','wave-clear','countdown'].includes(game.state)) game.togglePause(true);
+  game.autosave();
+});

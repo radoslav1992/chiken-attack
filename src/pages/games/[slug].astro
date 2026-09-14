@@ -1,45 +1,58 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import Leaderboard from '../../components/Leaderboard.astro';
-import { GAMES, PLAYABLE } from '../../data/games.js';
-import { SITE } from '../../data/site.js';
+import Layout from "../../layouts/Layout.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import Leaderboard from "../../components/Leaderboard.astro";
+import { GAMES, PLAYABLE } from "../../data/games.js";
+import { SITE } from "../../data/site.js";
 
 export function getStaticPaths() {
-  return PLAYABLE.map((game) => ({ params: { slug: game.slug }, props: { game } }));
+  return PLAYABLE.map((game) => ({
+    params: { slug: game.slug },
+    props: { game },
+  }));
 }
 
 const { game } = Astro.props;
-const related = GAMES.filter((g) => g.slug !== game.slug);
+const related = PLAYABLE.filter((g) => g.slug !== game.slug);
 
-const orgId = new URL('/#organization', Astro.site).href;
+const orgId = new URL("/#organization", Astro.site).href;
 const pageUrl = new URL(`/games/${game.slug}/`, Astro.site).href;
 const schema = [
   {
-    '@type': 'VideoGame',
-    '@id': `${pageUrl}#game`,
+    "@type": "VideoGame",
+    "@id": `${pageUrl}#game`,
     name: game.title,
     url: pageUrl,
     image: new URL(game.stageArt, Astro.site).href,
-    description: [game.blurb, ...game.about].join(' '),
+    description: [game.blurb, ...game.about].join(" "),
     genre: game.genre,
-    gamePlatform: 'Web browser',
-    operatingSystem: 'Any',
-    playMode: 'SinglePlayer',
-    applicationCategory: 'Game',
+    gamePlatform: "Web browser",
+    operatingSystem: "Any",
+    playMode: "SinglePlayer",
+    applicationCategory: "Game",
     numberOfPlayers: game.stats.players,
     datePublished: game.meta.releasedISO,
     dateModified: SITE.updated,
-    author: { '@id': orgId },
-    publisher: { '@id': orgId },
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', availability: 'https://schema.org/InStock' },
+    author: { "@id": orgId },
+    publisher: { "@id": orgId },
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+    },
   },
   {
-    '@type': 'BreadcrumbList',
+    "@type": "BreadcrumbList",
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Arcade', item: new URL('/', Astro.site).href },
-      { '@type': 'ListItem', position: 2, name: game.title, item: pageUrl },
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Arcade",
+        item: new URL("/", Astro.site).href,
+      },
+      { "@type": "ListItem", position: 2, name: game.title, item: pageUrl },
     ],
   },
 ];
@@ -54,120 +67,177 @@ const schema = [
 >
   <Header variant="game" />
 
-  <main>
-  <nav class="wrap breadcrumb" aria-label="Breadcrumb">
-    <a href="/">Arcade</a> / {game.genre} / <span class="breadcrumb-here">{game.title}</span>
-  </nav>
+  <main id="main">
+    <nav class="wrap breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Arcade</a> / {game.genre} /{" "}
+      <span class="breadcrumb-here">{game.title}</span>
+    </nav>
 
-  <section class="wrap game-layout">
-    <article>
-      <div class="stage" data-stage data-play-path={game.playPath} data-title={game.title}>
-        <img class="stage-art" src={game.stageArt} alt={`${game.title} title screen`} />
-        <div class="stage-overlay" data-stage-overlay>
-          <div class="stage-overlay-inner">
-            <h1 class="stage-title">{game.title.toUpperCase()}</h1>
-            <div class="stage-sub">{game.tagline.toUpperCase()}</div>
-            <button type="button" class="btn-pixel stage-start" data-start>▶ START GAME</button>
-            <div class="stage-status" data-stage-status>Loads in about a second. No install.</div>
+    <div
+      class="wrap challenge-banner"
+      data-challenge-banner
+      hidden
+      role="status"
+    ></div>
+    <section class="wrap game-layout">
+      <article>
+        <div
+          class="stage"
+          data-stage
+          data-play-path={game.playPath}
+          data-title={game.title}
+        >
+          <img
+            class="stage-art"
+            src={game.stageArt}
+            alt={`${game.title} title screen`}
+          />
+          <div class="stage-overlay" data-stage-overlay>
+            <div class="stage-overlay-inner">
+              <h1 class="stage-title">{game.title.toUpperCase()}</h1>
+              <div class="stage-sub">{game.tagline.toUpperCase()}</div>
+              <button type="button" class="btn-pixel stage-start" data-start>
+                ▶ START GAME
+              </button>
+              <div class="stage-status" data-stage-status>
+                No install. Touch or keyboard.
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="stage-tools">
-        <button type="button" class="tool-btn" data-fullscreen>⛶ Fullscreen</button>
-        <button type="button" class="tool-btn" data-sound aria-pressed="true">♪ Sound on</button>
-        <button type="button" class="tool-btn" data-fav aria-pressed="false">♥ Save to favourites</button>
-        <a class="tool-btn tool-btn-link" href={game.playPath}>Open full page ↗</a>
-      </div>
+        <div class="stage-tools">
+          <button type="button" class="tool-btn" data-fullscreen>
+            ⛶ Fullscreen
+          </button>
+          <button type="button" class="tool-btn" data-sound aria-pressed="true">
+            ♪ Sound on
+          </button>
+          <button type="button" class="tool-btn" data-share>
+            ↗ Share game
+          </button>
+          <button type="button" class="tool-btn" data-fav aria-pressed="false">
+            ♥ Save to favourites
+          </button>
+          <a class="tool-btn tool-btn-link" href={game.playPath}>
+            Open full page ↗
+          </a>
+        </div>
 
-      <div class="about-block">
-        <h2 class="h3-display">ABOUT THIS GAME</h2>
-        {game.about.map((para) => <p class="about-copy">{para}</p>)}
-      </div>
+        <p class="share-feedback" data-share-feedback role="status"></p>
+        <div class="about-block">
+          <h2 class="h3-display">ABOUT THIS GAME</h2>
+          {game.about.map((para) => (
+            <p class="about-copy">{para}</p>
+          ))}
+        </div>
 
-      <div class="info-cards">
-        <div class="info-card">
-          <h3>CONTROLS</h3>
-          <div class="control-list">
-            {
-              game.controls.map((c) => (
+        <div class="info-cards">
+          <div class="info-card">
+            <h3>CONTROLS</h3>
+            <div class="control-list">
+              {game.controls.map((c) => (
                 <div class="control-row">
                   <span class="control-key">{c.key}</span>
                   <span class="control-desc">{c.desc}</span>
                 </div>
-              ))
-            }
+              ))}
+            </div>
           </div>
-        </div>
-        <div class="info-card">
-          <h3>HOW TO WIN</h3>
-          <div class="tips-list">
-            {
-              game.tips.map((tip, i) => (
+          <div class="info-card">
+            <h3>HOW TO WIN</h3>
+            <div class="tips-list">
+              {game.tips.map((tip, i) => (
                 <div class="tip-row">
-                  <span class="tip-num">{String(i + 1).padStart(2, '0')}</span>
+                  <span class="tip-num">{String(i + 1).padStart(2, "0")}</span>
                   {tip}
                 </div>
-              ))
-            }
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </article>
+      </article>
 
-    <aside class="game-aside">
-      <div class="info-card">
-        <div class="fact-grid">
-          <div>
-            <div class="fact-label">Genre</div>
-            <div class="fact-num">{game.genre}</div>
+      <aside class="game-aside">
+        <div class="info-card">
+          <div class="fact-grid">
+            <div>
+              <div class="fact-label">Genre</div>
+              <div class="fact-num">{game.genre}</div>
+            </div>
+            <div>
+              <div class="fact-label">Size</div>
+              <div class="fact-num">{game.stats.size}</div>
+            </div>
+            <div>
+              <div class="fact-label">Run time</div>
+              <div class="fact-num">{game.stats.runTime}</div>
+            </div>
+            <div>
+              <div class="fact-label">Players</div>
+              <div class="fact-num">{game.stats.players}</div>
+            </div>
           </div>
-          <div>
-            <div class="fact-label">Size</div>
-            <div class="fact-num">{game.stats.size}</div>
+          <div class="fact-meta">
+            <div>
+              <span>Developer</span>
+              <span class="fact-meta-val">{game.meta.developer}</span>
+            </div>
+            <div>
+              <span>Released</span>
+              <span class="fact-meta-val">{game.meta.released}</span>
+            </div>
+            <div>
+              <span>Genre</span>
+              <span class="fact-meta-val">{game.meta.genreLine}</span>
+            </div>
           </div>
-          <div>
-            <div class="fact-label">Run time</div>
-            <div class="fact-num">{game.stats.runTime}</div>
-          </div>
-          <div>
-            <div class="fact-label">Players</div>
-            <div class="fact-num">{game.stats.players}</div>
+          <div class="cap-tags">
+            {game.capabilities.map((cap) => (
+              <span class="cap-tag">{cap}</span>
+            ))}
           </div>
         </div>
-        <div class="fact-meta">
-          <div><span>Developer</span><span class="fact-meta-val">{game.meta.developer}</span></div>
-          <div><span>Released</span><span class="fact-meta-val">{game.meta.released}</span></div>
-          <div><span>Genre</span><span class="fact-meta-val">{game.meta.genreLine}</span></div>
+
+        <div class="board-titled">
+          <div class="board-titled-head">TOP SCORES THIS WEEK</div>
+          {game.slug === "chicken-attack" && (
+            <label class="board-mode">
+              Difficulty{" "}
+              <select data-board-mode>
+                <option value="veteran">Veteran</option>
+                <option value="rookie">Rookie</option>
+                <option value="superstar">Superstar</option>
+              </select>
+            </label>
+          )}
+          <Leaderboard game={game.slug} limit={5} period="week" compact />
         </div>
-        <div class="cap-tags">
-          {game.capabilities.map((cap) => <span class="cap-tag">{cap}</span>)}
+
+        <div class="callout">
+          <div class="callout-title">FREE, LIKE THE REST</div>
+          <p class="callout-copy">
+            No account needed. Finish a run and the name you enter at game over
+            goes on the board.
+          </p>
+          <a href="/#leaderboard" class="callout-cta">
+            SEE THE HALL OF FAME
+          </a>
         </div>
-      </div>
+      </aside>
+    </section>
 
-      <div class="board-titled">
-        <div class="board-titled-head">TOP SCORES THIS WEEK</div>
-        <Leaderboard game={game.slug} limit={5} period="week" compact />
-      </div>
-
-      <div class="callout">
-        <div class="callout-title">FREE, LIKE THE REST</div>
-        <p class="callout-copy">
-          No account needed. Finish a run and the name you enter at game over goes on the board.
-        </p>
-        <a href="/#leaderboard" class="callout-cta">SEE THE HALL OF FAME</a>
-      </div>
-    </aside>
-  </section>
-
-  <section class="related">
-    <div class="wrap related-inner">
-      <h2 class="h3-display">IF YOU LIKED THIS</h2>
-      <div class="related-grid">
-        {
-          related.map((g) =>
+    <section class="related">
+      <div class="wrap related-inner">
+        <h2 class="h3-display">IF YOU LIKED THIS</h2>
+        <div class="related-grid">
+          {related.map((g) =>
             g.playable ? (
-              <a href={`/games/${g.slug}/`} class="game-card" data-genre={g.genre}>
+              <a
+                href={`/games/${g.slug}/`}
+                class="game-card"
+                data-genre={g.genre}
+              >
                 <div class="game-card-screen">
                   <img src={g.art} alt={`${g.title} art`} loading="lazy" />
                 </div>
@@ -186,89 +256,180 @@ const schema = [
                 </div>
                 <div class="game-card-genre">{g.genre} · soon</div>
               </div>
-            )
-          )
-        }
+            ),
+          )}
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
   </main>
 
   <Footer variant="game" />
 </Layout>
 
 <script>
-  const stage = document.querySelector<HTMLElement>('[data-stage]');
-  const overlay = document.querySelector<HTMLElement>('[data-stage-overlay]');
-  const status = document.querySelector<HTMLElement>('[data-stage-status]');
-  const startBtn = document.querySelector<HTMLButtonElement>('[data-start]');
-  const soundBtn = document.querySelector<HTMLButtonElement>('[data-sound]');
-  const favBtn = document.querySelector<HTMLButtonElement>('[data-fav]');
-  const fsBtn = document.querySelector<HTMLButtonElement>('[data-fullscreen]');
-
+  import {
+    challengeFrom,
+    shareLink,
+    scoreLink,
+  } from "../../../public/shared/arcade.js";
+  const stage = document.querySelector<HTMLElement>("[data-stage]")!;
+  const overlay = document.querySelector<HTMLElement>("[data-stage-overlay]");
+  const status = document.querySelector<HTMLElement>("[data-stage-status]");
+  const startBtn = document.querySelector<HTMLButtonElement>("[data-start]");
+  const soundBtn = document.querySelector<HTMLButtonElement>("[data-sound]");
+  const favBtn = document.querySelector<HTMLButtonElement>("[data-fav]");
+  const fsBtn = document.querySelector<HTMLButtonElement>("[data-fullscreen]");
+  const shareBtn = document.querySelector<HTMLButtonElement>("[data-share]");
+  const feedback = document.querySelector<HTMLElement>("[data-share-feedback]");
+  const slug = (stage.dataset.playPath || "").replaceAll("/", "");
+  const challenge = challengeFrom(location.search);
   let frame: HTMLIFrameElement | null = null;
   let soundOn = true;
-
-  /* START: swap the poster for the game itself, in-place. */
-  startBtn?.addEventListener('click', () => {
-    if (!stage || frame) return;
-    if (status) status.textContent = 'Loading…';
-    frame = document.createElement('iframe');
-    frame.src = stage.dataset.playPath || '/';
-    frame.className = 'stage-frame';
-    frame.allow = 'fullscreen; gamepad; vibration';
-    frame.title = stage.dataset.title || 'Game';
-    frame.addEventListener('load', () => {
+  let lastResult: { score: number; mode: string } | null = null;
+  if (challenge) {
+    const banner = document.querySelector<HTMLElement>(
+      "[data-challenge-banner]",
+    )!;
+    banner.hidden = false;
+    banner.textContent = `The score to beat: ${challenge.score.toLocaleString()} in ${stage.dataset.title}${slug === "chicken-attack" ? ` · ${challenge.mode}` : ""}. Think you can?`;
+  }
+  function start() {
+    if (frame) return;
+    if (status) status.textContent = "Opening your game…";
+    frame = document.createElement("iframe");
+    const url = new URL(stage.dataset.playPath || "/", location.origin);
+    if (challenge) {
+      url.searchParams.set("challenge", String(challenge.score));
+      url.searchParams.set("mode", challenge.mode);
+    }
+    frame.src = url.href;
+    frame.className = "stage-frame";
+    frame.allow = "fullscreen; gamepad; autoplay";
+    frame.title = stage.dataset.title || "Game";
+    const timer = window.setTimeout(() => {
+      if (status)
+        status.textContent =
+          "Taking longer than expected. Try “Open full page” below.";
+    }, 12000);
+    frame.addEventListener("load", () => {
+      clearTimeout(timer);
       overlay?.remove();
       pushSound();
+      frame?.focus();
     });
     stage.append(frame);
-    stage.classList.add('is-playing');
-  });
-
-  /* Sound toggle: forwarded into the game via postMessage. */
-  function pushSound() {
-    frame?.contentWindow?.postMessage({ type: 'arcade:set-sound', on: soundOn }, location.origin);
+    stage.classList.add("is-playing");
   }
-  soundBtn?.addEventListener('click', () => {
+  startBtn?.addEventListener("click", start);
+  // A lobby play link skips the extra poster click, retaining the game's own menu.
+  if (new URLSearchParams(location.search).get("play") === "1") start();
+  function pushSound() {
+    frame?.contentWindow?.postMessage(
+      { type: "arcade:set-sound", on: soundOn },
+      location.origin,
+    );
+  }
+  soundBtn?.addEventListener("click", () => {
     soundOn = !soundOn;
-    soundBtn.textContent = soundOn ? '♪ Sound on' : '✕ Sound off';
-    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    soundBtn.textContent = soundOn ? "♪ Sound on" : "✕ Sound off";
+    soundBtn.setAttribute("aria-pressed", String(soundOn));
     pushSound();
   });
-
-  /* Fullscreen the stage (works before or after starting). */
-  fsBtn?.addEventListener('click', () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else stage?.requestFullscreen?.().catch(() => {});
+  fsBtn?.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (stage.requestFullscreen) await stage.requestFullscreen();
+      else if (feedback)
+        feedback.textContent =
+          "Use “Open full page” for a larger game on this browser.";
+    } catch {
+      if (feedback)
+        feedback.textContent =
+          "Fullscreen unavailable. Use “Open full page” instead.";
+    }
   });
-
-  /* Favourites: a heart in localStorage, nothing more. */
-  const FAV_KEY = 'beaver-games.favs';
-  const slug = (stage?.dataset.playPath || '').replaceAll('/', '');
+  document.addEventListener("fullscreenchange", () => {
+    if (fsBtn)
+      fsBtn.textContent = document.fullscreenElement
+        ? "⛶ Exit fullscreen"
+        : "⛶ Fullscreen";
+  });
   const readFavs = (): string[] => {
     try {
-      return JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+      const v = JSON.parse(localStorage.getItem("beaver-games.favs") || "[]");
+      return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
     } catch {
       return [];
     }
   };
-  const paintFav = () => {
+  function paintFav() {
     const on = readFavs().includes(slug);
     if (favBtn) {
-      favBtn.textContent = on ? '♥ Saved' : '♥ Save to favourites';
-      favBtn.setAttribute('aria-pressed', String(on));
+      favBtn.textContent = on ? "♥ Saved" : "♥ Save to favourites";
+      favBtn.setAttribute("aria-pressed", String(on));
     }
-  };
-  favBtn?.addEventListener('click', () => {
-    const favs = readFavs();
-    const i = favs.indexOf(slug);
-    if (i >= 0) favs.splice(i, 1);
-    else favs.push(slug);
+  }
+  favBtn?.addEventListener("click", () => {
+    const list = readFavs();
     try {
-      localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+      localStorage.setItem(
+        "beaver-games.favs",
+        JSON.stringify(
+          list.includes(slug)
+            ? list.filter((s) => s !== slug)
+            : [...list, slug],
+        ),
+      );
     } catch {}
     paintFav();
   });
   paintFav();
+  window.addEventListener("message", (event) => {
+    if (
+      event.origin !== location.origin ||
+      event.source !== frame?.contentWindow
+    )
+      return;
+    if (event.data?.type === "arcade:score-posted") {
+      window.dispatchEvent(new Event("arcade:refresh-board"));
+      return;
+    }
+    if (event.data?.type !== "arcade:result" || event.data.slug !== slug)
+      return;
+    const { score, mode } = event.data;
+    if (
+      !Number.isSafeInteger(score) ||
+      score <= 0 ||
+      score > 100000000 ||
+      !["rookie", "veteran", "superstar"].includes(mode)
+    )
+      return;
+    lastResult = { score, mode };
+    if (shareBtn) shareBtn.textContent = "↗ Challenge a friend";
+    if (feedback)
+      feedback.textContent = `${score.toLocaleString()} points. Give a friend something to beat.`;
+    window.dispatchEvent(new Event("arcade:refresh-board"));
+  });
+  shareBtn?.addEventListener("click", () =>
+    shareLink(
+      {
+        title: `${stage.dataset.title} · Beaver Games`,
+        text: lastResult
+          ? `I scored ${lastResult.score.toLocaleString()} in ${stage.dataset.title}. Your turn.`
+          : `Play ${stage.dataset.title} with me on Beaver Games.`,
+        url: lastResult
+          ? scoreLink(slug, lastResult.score, lastResult.mode)
+          : new URL(`/games/${slug}/`, location.origin).href,
+      },
+      feedback,
+    ),
+  );
+  document
+    .querySelector<HTMLSelectElement>("[data-board-mode]")
+    ?.addEventListener("change", (event) => {
+      const board = document.querySelector<HTMLElement>("[data-board]");
+      if (board)
+        board.dataset.difficulty = (event.target as HTMLSelectElement).value;
+      window.dispatchEvent(new Event("arcade:refresh-board"));
+    });
 </script>

@@ -8,11 +8,11 @@
 export const SITE = {
   name: 'Beaver Games',
   description:
-    'Hand-picked browser games that load in under a second. No installs, no ads, playable offline.',
+    'Four free browser games. Blast space chickens, run through the forest, play pinball, or build a woodland shop. No downloads or sign-up.',
   author: 'The Coop',
   locale: 'en',
   // Bump when site content meaningfully changes; feeds dateModified/lastmod.
-  updated: '2026-08-04',
+  updated: '2026-09-14',
   // Default social share image (used when a page has nothing better).
   ogImage: '/media/beaver-games-logo.png',
   ogImageAlt: 'Beaver Games logo',

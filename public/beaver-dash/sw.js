@@ -5,10 +5,12 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'beaver-dash-v2';
+const VERSION = 'beaver-dash-arcade-20260914';
 const SHELL = './';
 
 const ASSETS = [
+  '/shared/arcade.js',
+  '/shared/arcade.css',
   SHELL,
   'manifest.webmanifest',
   'css/styles.css',

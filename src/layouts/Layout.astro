@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import '../styles/arcade.css';
 import { SITE, jsonLd } from '../data/site.js';
 
 interface Props {
@@ -66,7 +67,7 @@ const graph = {
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'} />
     <meta name="generator" content={Astro.generator} />
     <link rel="canonical" href={canonical} />
-    <meta name="theme-color" content="#12101c" />
+    <meta name="theme-color" content="#141715" />
     <link rel="icon" href="/chicken-attack/icons/icon-192.png" sizes="192x192" />
 
     <meta property="og:site_name" content={SITE.name} />
@@ -88,6 +89,7 @@ const graph = {
     <script type="application/ld+json" set:html={jsonLd(graph)} />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <slot />
   </body>
 </html>

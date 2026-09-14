@@ -1,3 +1,4 @@
+import { isEditing } from '../../shared/arcade.js';
 /*
  * Unified input: touch drag (mobile-first), mouse, keyboard and gamepad.
  * The game loop only ever reads the resolved axis/flag state below.
@@ -133,6 +134,10 @@ export class Input {
   }
 
   _key(e, down) {
+    if (isEditing(e.target) || (e.ctrlKey && e.key !== 'Control') || e.metaKey || e.altKey) {
+      if (!down) this.keys.delete(e.key.toLowerCase());
+      return;
+    }
     const k = e.key.toLowerCase();
     const codes = [
       'arrowleft', 'arrowright', 'arrowup', 'arrowdown',

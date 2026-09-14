@@ -11,15 +11,15 @@ export const FAQ = [
   },
   {
     q: 'Do I need to download or install anything?',
-    a: 'No. Every game is a web page: open it, play it, close the tab. The biggest game is about 0.4 MB and loads in under a second. If you want an app icon, each game can optionally be installed as a PWA from your browser.',
+    a: 'No. Every game is a web page: open it, play it, close the tab. If you want an app icon, each game can optionally be installed as a PWA from your browser.',
   },
   {
     q: 'Do the games work offline?',
-    a: 'Yes. Each game ships its own service worker, so after the first visit it keeps working with no connection at all — on a plane, on hotel wifi, or on the school network.',
+    a: 'Each game can work offline after its first successful load and offline cache setup. Keep the game bookmarked. Community boards and newsletter signup require a connection.',
   },
   {
     q: 'Do I need an account to play or save progress?',
-    a: 'No accounts, ever. Runs and settings save to your device automatically. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
+    a: 'No accounts, ever. Personal bests and settings save on this device. Chicken Attack saves between waves; Whittle & Wares keeps a start-of-day checkpoint. Clearing browser data removes these saves. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
   },
   {
     q: 'What devices and browsers are supported?',
@@ -27,6 +27,6 @@ export const FAQ = [
   },
   {
     q: 'How do the leaderboards work?',
-    a: 'Each game has a weekly board that resets every Monday at 00:00 UTC. The score you post at game over is the score that counts, ranked with a secondary stat per game — waves in Chicken Attack, metres in Beaver Dash, rank in Orbit Cadet.',
+    a: 'Each game has a weekly board that resets every Monday at 00:00 UTC. Scores are player-submitted and sorted highest first; earlier submissions win ties. Chicken Attack has separate difficulty boards. A challenge link shares a score target, not an identical random level.',
   },
 ];

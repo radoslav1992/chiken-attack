@@ -5,10 +5,12 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'whittle-wares-v1';
+const VERSION = 'whittle-wares-arcade-20260914';
 const SHELL = './';
 
 const ASSETS = [
+  '/shared/arcade.js',
+  '/shared/arcade.css',
   SHELL,
   'manifest.webmanifest',
   'css/styles.css',
