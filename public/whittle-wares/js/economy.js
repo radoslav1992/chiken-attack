@@ -20,7 +20,7 @@
  * re-examined instead of re-rolled.
  */
 export function makeRng(seed) {
-  let s = (seed >>> 0) || 1;
+  let s = seed >>> 0 || 1;
   const next = () => {
     // xorshift32: small, fast, and good enough for shopkeeping.
     s ^= s << 13;
@@ -30,9 +30,14 @@ export function makeRng(seed) {
     s >>>= 0;
     return s / 4294967296;
   };
+  next.state = () => s >>> 0;
+  next.restore = (value) => {
+    s = value >>> 0;
+  };
   next.range = (lo, hi) => lo + next() * (hi - lo);
   next.int = (lo, hi) => Math.floor(next.range(lo, hi + 1));
-  next.pick = (arr) => arr[Math.min(arr.length - 1, Math.floor(next() * arr.length))];
+  next.pick = (arr) =>
+    arr[Math.min(arr.length - 1, Math.floor(next() * arr.length))];
   /** Weighted pick: `weights[i]` is the relative chance of `arr[i]`. */
   next.weighted = (arr, weights) => {
     let total = 0;
@@ -57,21 +62,96 @@ export function makeRng(seed) {
  */
 export const ITEMS = {
   bark: { name: 'Birch Bark', value: 4, zone: 0, colour: '#e8dcc0', spoils: 0 },
-  berry: { name: 'Bramble Berries', value: 6, zone: 0, colour: '#c2385f', spoils: 3 },
-  resin: { name: 'Pine Resin', value: 10, zone: 0, colour: '#e0a423', spoils: 0 },
+  berry: {
+    name: 'Bramble Berries',
+    value: 6,
+    zone: 0,
+    colour: '#c2385f',
+    spoils: 3,
+  },
+  resin: {
+    name: 'Pine Resin',
+    value: 10,
+    zone: 0,
+    colour: '#e0a423',
+    spoils: 0,
+  },
   clay: { name: 'River Clay', value: 9, zone: 1, colour: '#a4705a', spoils: 0 },
   flint: { name: 'Flint', value: 14, zone: 1, colour: '#7d8794', spoils: 0 },
-  honey: { name: 'Wild Honey', value: 22, zone: 1, colour: '#f0b429', spoils: 5 },
-  ironwood: { name: 'Ironwood', value: 30, zone: 2, colour: '#5d4433', spoils: 0 },
+  honey: {
+    name: 'Wild Honey',
+    value: 22,
+    zone: 1,
+    colour: '#f0b429',
+    spoils: 5,
+  },
+  ironwood: {
+    name: 'Ironwood',
+    value: 30,
+    zone: 2,
+    colour: '#5d4433',
+    spoils: 0,
+  },
   amber: { name: 'Amber', value: 40, zone: 3, colour: '#ff9f1c', spoils: 0 },
 
   // Crafted. Made at the workbench, worth more than their parts, and the only
   // way the late game pays the late rent.
-  basket: { name: 'Bark Basket', value: 34, crafted: true, colour: '#d8b48a', spoils: 0 },
-  pot: { name: 'Clay Pot', value: 40, crafted: true, colour: '#b5754f', spoils: 0 },
-  jam: { name: 'Bramble Jam', value: 62, crafted: true, colour: '#8e2246', spoils: 8 },
-  hatchet: { name: 'Flint Hatchet', value: 96, crafted: true, colour: '#8b949e', spoils: 0 },
-  charm: { name: 'Amber Charm', value: 150, crafted: true, colour: '#ffb43d', spoils: 0 },
+  basket: {
+    name: 'Bark Basket',
+    value: 34,
+    crafted: true,
+    colour: '#d8b48a',
+    spoils: 0,
+  },
+  pot: {
+    name: 'Clay Pot',
+    value: 40,
+    crafted: true,
+    colour: '#b5754f',
+    spoils: 0,
+  },
+  jam: {
+    name: 'Bramble Jam',
+    value: 62,
+    crafted: true,
+    colour: '#8e2246',
+    spoils: 8,
+  },
+  hatchet: {
+    name: 'Flint Hatchet',
+    value: 96,
+    crafted: true,
+    colour: '#8b949e',
+    spoils: 0,
+  },
+  chime: {
+    name: 'Woodland Chimes',
+    value: 220,
+    crafted: true,
+    colour: '#7fd5c6',
+    spoils: 0,
+  },
+  chest: {
+    name: 'Keepsake Chest',
+    value: 340,
+    crafted: true,
+    colour: '#d89860',
+    spoils: 0,
+  },
+  clock: {
+    name: 'Forest Clock',
+    value: 520,
+    crafted: true,
+    colour: '#e8c56e',
+    spoils: 0,
+  },
+  charm: {
+    name: 'Amber Charm',
+    value: 150,
+    crafted: true,
+    colour: '#ffb43d',
+    spoils: 0,
+  },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS);
@@ -90,12 +170,17 @@ export const RECIPES = {
   jam: { berry: 3, honey: 1 },
   hatchet: { flint: 1, ironwood: 1, resin: 1 },
   charm: { amber: 1, resin: 1, bark: 1 },
+  chime: { ironwood: 2, flint: 2, resin: 1 },
+  chest: { ironwood: 3, amber: 1, resin: 2 },
+  clock: { ironwood: 3, amber: 2, flint: 2 },
 };
 
 /** The two the Master Bench adds. Everything else you can make from day one. */
 export const MASTER_RECIPES = ['hatchet', 'charm'];
 
 export function recipeOpen(id, upgrades) {
+  const guild = { chime: 'artisan1', chest: 'artisan3', clock: 'artisan5' };
+  if (guild[id]) return upgrades.includes(guild[id]);
   return !MASTER_RECIPES.includes(id) || upgrades.includes('masterBench');
 }
 
@@ -125,18 +210,49 @@ export function canCraft(inv, id, upgrades = []) {
  * decide.
  */
 export const UPGRADES = [
-  { id: 'boots', name: 'Oiled Boots', cost: 120, blurb: '+30 stamina. More time in the wood each morning.' },
+  {
+    id: 'boots',
+    name: 'Oiled Boots',
+    cost: 120,
+    blurb: '+30 stamina. More time in the wood each morning.',
+  },
   /* The workbench used to be a 220-coin upgrade, which measured out at a median
    * of day FOUR before a player could craft anything at all. Three days of "walk
    * out, pick things up, sell them" is the whole game for most of a first
    * session, and it is not enough of one. Everyone has a bench now; what you buy
    * is the good half of the recipe book. */
-  { id: 'masterBench', name: 'Master Bench', cost: 260, blurb: 'Unlocks the Flint Hatchet and Amber Charm — the two best things you can make.' },
-  { id: 'shelves', name: 'Wider Shelves', cost: 160, blurb: 'Shop holds 22 goods instead of 12.' },
+  {
+    id: 'masterBench',
+    name: 'Master Bench',
+    cost: 260,
+    blurb:
+      'Unlocks the Flint Hatchet and Amber Charm — the two best things you can make.',
+  },
+  {
+    id: 'shelves',
+    name: 'Wider Shelves',
+    cost: 160,
+    blurb: 'Shop holds 22 goods instead of 12.',
+  },
   { id: 'sign', name: 'Painted Sign', cost: 200, blurb: '+4 customers a day.' },
-  { id: 'axe', name: 'Steel Axe', cost: 240, blurb: 'Opens the Ironwood Stand, and every node gives one more.' },
-  { id: 'lantern', name: 'Lantern', cost: 300, blurb: 'Opens the Deep Hollow, where the amber is.' },
-  { id: 'ledger', name: "Trader's Ledger", cost: 280, blurb: 'See exactly what each customer will pay.' },
+  {
+    id: 'axe',
+    name: 'Steel Axe',
+    cost: 240,
+    blurb: 'Opens the Ironwood Stand, and every node gives one more.',
+  },
+  {
+    id: 'lantern',
+    name: 'Lantern',
+    cost: 300,
+    blurb: 'Opens the Deep Hollow, where the amber is.',
+  },
+  {
+    id: 'ledger',
+    name: "Trader's Ledger",
+    cost: 280,
+    blurb: 'See exactly what each customer will pay.',
+  },
 ];
 
 export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map((u) => [u.id, u]));
@@ -154,10 +270,42 @@ export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map((u) => [u.id, u]));
  * the shallows is free of anything but the gathering.
  */
 export const ZONES = [
-  { id: 0, name: 'Willow Bank', needs: null, travel: 0, nodes: 10, items: ['bark', 'bark', 'berry', 'berry', 'resin'], hazard: 0.08 },
-  { id: 1, name: 'Stone Ford', needs: null, travel: 6, nodes: 8, items: ['clay', 'clay', 'flint', 'bark', 'berry'], hazard: 0.26 },
-  { id: 2, name: 'Ironwood Stand', needs: 'axe', travel: 13, nodes: 6, items: ['ironwood', 'ironwood', 'resin', 'flint', 'honey'], hazard: 0.42 },
-  { id: 3, name: 'Deep Hollow', needs: 'lantern', travel: 21, nodes: 5, items: ['amber', 'ironwood', 'honey', 'clay', 'resin'], hazard: 0.58 },
+  {
+    id: 0,
+    name: 'Willow Bank',
+    needs: null,
+    travel: 0,
+    nodes: 10,
+    items: ['bark', 'bark', 'berry', 'berry', 'resin'],
+    hazard: 0.08,
+  },
+  {
+    id: 1,
+    name: 'Stone Ford',
+    needs: null,
+    travel: 6,
+    nodes: 8,
+    items: ['clay', 'clay', 'flint', 'bark', 'berry'],
+    hazard: 0.26,
+  },
+  {
+    id: 2,
+    name: 'Ironwood Stand',
+    needs: 'axe',
+    travel: 13,
+    nodes: 6,
+    items: ['ironwood', 'ironwood', 'resin', 'flint', 'honey'],
+    hazard: 0.42,
+  },
+  {
+    id: 3,
+    name: 'Deep Hollow',
+    needs: 'lantern',
+    travel: 21,
+    nodes: 5,
+    items: ['amber', 'ironwood', 'honey', 'clay', 'resin'],
+    hazard: 0.58,
+  },
 ];
 
 /** Stamina per node: the gather itself plus the walk between nodes in a band. */
@@ -176,7 +324,7 @@ export const RENT_EVERY = 5;
 export function rentDue(day) {
   if (day % RENT_EVERY !== 0) return 0;
   const period = day / RENT_EVERY;
-  return Math.round(120 * Math.pow(1.52, period - 1));
+  return Math.round(120 * Math.pow(1.52, Math.min(5, period - 1)));
 }
 
 /** Every rent payment up to and including `day`. Used by the balance sim. */
@@ -191,8 +339,10 @@ export function rentThrough(day) {
  * information the player is reading when they set prices, and the reason the
  * right answer changes from day to day rather than being solved once.
  */
-export function dailyMarket(day, rng) {
-  const pool = ITEM_IDS.slice();
+export function dailyMarket(day, rng, upgrades) {
+  const pool = upgrades
+    ? supplyable(upgrades).concat(['bark', 'berry'])
+    : ITEM_IDS.slice();
   const hot = [];
   for (let i = 0; i < 2; i++) {
     const pick = rng.int(0, pool.length - 1);
@@ -211,8 +361,30 @@ export function dailyMarket(day, rng) {
  * number is private unless you have bought the Ledger, which is what that
  * upgrade is actually selling — not money, but the removal of guessing.
  */
-const FIRST = ['Bramble', 'Ash', 'Wren', 'Otter', 'Fen', 'Moss', 'Pike', 'Rowan', 'Heather', 'Vole', 'Elm', 'Tansy'];
-const LAST = ['Nutkin', 'Thistledown', 'Reedy', 'Burrows', 'Quickpaw', 'Hollow', 'Greenwater', 'Stonepaw'];
+const FIRST = [
+  'Bramble',
+  'Ash',
+  'Wren',
+  'Otter',
+  'Fen',
+  'Moss',
+  'Pike',
+  'Rowan',
+  'Heather',
+  'Vole',
+  'Elm',
+  'Tansy',
+];
+const LAST = [
+  'Nutkin',
+  'Thistledown',
+  'Reedy',
+  'Burrows',
+  'Quickpaw',
+  'Hollow',
+  'Greenwater',
+  'Stonepaw',
+];
 
 export function customerCount(day, rep, upgrades, rng) {
   const base = 4 + Math.min(6, Math.floor(day / 3));
@@ -224,7 +396,9 @@ export function customerCount(day, rep, upgrades, rng) {
    * fewer sales and more desperate pricing. A bad week should hurt, not be
    * unrecoverable. */
   const fromRep = rep >= 0 ? Math.round(rep / 12) : Math.round(rep / 26);
-  const fromSign = upgrades.includes('sign') ? 4 : 0;
+  const fromSign =
+    (upgrades.includes('sign') ? 4 : 0) +
+    upgrades.filter((id) => /^hospitality[1-5]$/.test(id)).length;
   return Math.max(4, base + fromRep + fromSign + rng.int(-1, 1));
 }
 
@@ -237,12 +411,17 @@ export function makeCustomer(day, rep, market, stock, rng) {
   const choices = stock.length ? stock : RAW_IDS;
   /* Weight the want toward what is in demand today, so a hot good genuinely
    * draws traffic rather than only paying more when it happens to sell. */
-  const weights = choices.map((id) => (market.mult[id] >= 1.4 ? 3 : market.mult[id] < 1 ? 0.7 : 1.6));
+  const weights = choices.map((id) =>
+    market.mult[id] >= 1.4 ? 3 : market.mult[id] < 1 ? 0.7 : 1.6,
+  );
   const wants = rng.weighted(choices, weights);
 
   const taste = rng.range(0.78, 1.32);
   const repFactor = 1 + Math.max(-0.18, Math.min(0.22, rep / 500));
-  const wtp = Math.max(1, Math.round(ITEMS[wants].value * market.mult[wants] * taste * repFactor));
+  const wtp = Math.max(
+    1,
+    Math.round(ITEMS[wants].value * market.mult[wants] * taste * repFactor),
+  );
 
   return {
     name: `${rng.pick(FIRST)} ${rng.pick(LAST)}`,
@@ -269,7 +448,8 @@ export function makeCustomer(day, rep, market, stock, rng) {
  */
 export function evaluateOffer(customer, price) {
   if (price <= customer.wtp) return 'buy';
-  if (!customer.haggled && price <= customer.wtp * customer.patience) return 'haggle';
+  if (!customer.haggled && price <= customer.wtp * customer.patience)
+    return 'haggle';
   return 'leave';
 }
 
@@ -311,7 +491,8 @@ const PATIENCE_MID = 1.275;
 export function priceOutlook(id, price, market, rep = 0) {
   const repFactor = 1 + Math.max(-0.18, Math.min(0.22, rep / 500));
   const centre = Math.max(1, ITEMS[id].value * market.mult[id] * repFactor);
-  const share = (r) => Math.max(0, Math.min(1, (TASTE_HI - r) / (TASTE_HI - TASTE_LO)));
+  const share = (r) =>
+    Math.max(0, Math.min(1, (TASTE_HI - r) / (TASTE_HI - TASTE_LO)));
   const buy = share(price / centre);
   const upTo = share(price / centre / PATIENCE_MID);
   const haggle = Math.max(0, upTo - buy);
@@ -326,19 +507,29 @@ export function priceCeiling(id, market) {
 
 /** A short verdict for the label beside the price. */
 export function priceLabel(outlook) {
-  if (outlook.buy >= 0.85) return { text: 'Everyone will take it', tone: 'cheap' };
+  if (outlook.buy >= 0.85)
+    return { text: 'Everyone will take it', tone: 'cheap' };
   if (outlook.buy >= 0.5) return { text: 'Most will buy', tone: 'good' };
-  if (outlook.buy + outlook.haggle >= 0.65) return { text: 'Expect haggling', tone: 'fair' };
-  if (outlook.buy + outlook.haggle >= 0.3) return { text: 'Many will walk out', tone: 'dear' };
+  if (outlook.buy + outlook.haggle >= 0.65)
+    return { text: 'Expect haggling', tone: 'fair' };
+  if (outlook.buy + outlook.haggle >= 0.3)
+    return { text: 'Many will walk out', tone: 'dear' };
   return { text: 'Nobody will pay this', tone: 'bad' };
 }
 
 export function stockCapacity(upgrades) {
-  return upgrades.includes('shelves') ? 22 : 12;
+  return (
+    (upgrades.includes('shelves') ? 22 : 12) +
+    upgrades.filter((id) => /^display[1-5]$/.test(id)).length * 4
+  );
 }
 
 export function maxStamina(upgrades) {
-  return 100 + (upgrades.includes('boots') ? 30 : 0);
+  return (
+    100 +
+    (upgrades.includes('boots') ? 30 : 0) +
+    upgrades.filter((id) => /^trail[1-5]$/.test(id)).length * 8
+  );
 }
 
 /** How many units one node gives. The axe pays off on every node, not just the
@@ -360,7 +551,11 @@ export function spoil(inv, ages) {
   const lost = {};
   for (const id in inv) {
     const life = ITEMS[id].spoils;
-    if (!life || !inv[id]) continue;
+    if (!inv[id]) {
+      ages[id] = 0;
+      continue;
+    }
+    if (!life) continue;
     ages[id] = (ages[id] || 0) + 1;
     if (ages[id] >= life) {
       lost[id] = inv[id];
@@ -386,8 +581,15 @@ export function spoil(inv, ages) {
  */
 
 const ORDER_NAMES = [
-  'the Ferryman', 'Widow Thorn', 'the Miller', 'Bracken Hall', 'the Ford Inn',
-  'the Charcoal Burner', 'Sister Wren', 'the Bell Foundry', 'the Roadwarden',
+  'the Ferryman',
+  'Widow Thorn',
+  'the Miller',
+  'Bracken Hall',
+  'the Ford Inn',
+  'the Charcoal Burner',
+  'Sister Wren',
+  'the Bell Foundry',
+  'the Roadwarden',
 ];
 
 /** Everything the player could plausibly supply right now. */
@@ -415,7 +617,9 @@ export function makeOrder(day, rng, upgrades, seq = 0) {
   const pool = supplyable(upgrades);
   /* Weighted toward things you have to MAKE rather than merely find, because a
    * commission for four bits of bark is not a plan, it is an errand. */
-  const weights = pool.map((id) => (ITEMS[id].crafted ? 3 : ITEMS[id].value >= 14 ? 2 : 1));
+  const weights = pool.map((id) =>
+    ITEMS[id].crafted ? 3 : ITEMS[id].value >= 14 ? 2 : 1,
+  );
   const item = rng.weighted(pool, weights);
   const qty = ITEMS[item].crafted ? rng.int(2, 3) : rng.int(3, 6);
   const pay = Math.round(ITEMS[item].value * qty * ORDER_MULT);

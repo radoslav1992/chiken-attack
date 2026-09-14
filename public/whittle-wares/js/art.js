@@ -71,7 +71,13 @@ export const PAL = {
  * drawing a second set, which halves the art and guarantees the two directions
  * stay in step with each other.
  */
-const BEAVER_PAL = { f: PAL.fur, l: PAL.furLit, d: PAL.furDark, i: PAL.ink, t: PAL.tooth };
+const BEAVER_PAL = {
+  f: PAL.fur,
+  l: PAL.furLit,
+  d: PAL.furDark,
+  i: PAL.ink,
+  t: PAL.tooth,
+};
 
 const BEAVER_A = [
   '................',
@@ -127,7 +133,8 @@ const WASP = [
   '....i...',
 ];
 
-export const waspSprite = () => sprite('wasp', WASP, { w: PAL.wasp, i: PAL.ink });
+export const waspSprite = () =>
+  sprite('wasp', WASP, { w: PAL.wasp, i: PAL.ink });
 
 /* --- tiles ----------------------------------------------------------------
  * 16x16 each, one bake per (tile, band) pair. The band tint is what makes the
@@ -286,14 +293,166 @@ export function tileArt(name, band) {
  * the satchel and the thing in the grass are recognisably the same object.
  */
 const NODE_SHAPE = {
-  bark: ['..cccc..', '.cccccc.', 'cc.cc.cc', 'cccccccc', 'cc.cc.cc', '.cccccc.', '..cccc..', '........'],
-  berry: ['........', '..cc.cc.', '.cccccc.', '.cccccc.', '..cccc..', '...cc...', '..dddd..', '........'],
-  resin: ['...cc...', '..cccc..', '.cccccc.', 'cccccccc', 'cccccccc', '.cccccc.', '..cccc..', '........'],
-  clay: ['........', '..cccc..', '.cccccc.', 'cccccccc', 'cccccccc', 'cccccccc', '.dddddd.', '........'],
-  flint: ['....c...', '...cc c.', '..cccccc', '.ccccccc', 'ccccccc.', 'cccccc..', '.cccc...', '..c.....'],
-  honey: ['..cccc..', '.cccccc.', 'cc.cc.cc', 'cccccccc', 'cc.cc.cc', '.cccccc.', '..dddd..', '........'],
-  ironwood: ['.cc..cc.', '.cc..cc.', '.cccccc.', '.cc..cc.', '.cc..cc.', '.cccccc.', '.cc..cc.', '........'],
-  amber: ['...cc...', '..cccc..', '.cccccc.', 'ccc..ccc', 'ccc..ccc', '.cccccc.', '..cccc..', '...cc...'],
+  basket: [
+    '..cccc..',
+    '.c....c.',
+    '.c....c.',
+    'cccccccc',
+    'cdcdcdcc',
+    '.cdcdcc.',
+    '.cccccc.',
+    '........',
+  ],
+  pot: [
+    '..cccc..',
+    '...cc...',
+    '..cccc..',
+    '.cccccc.',
+    'cccccccc',
+    'cccccccc',
+    '.cccccc.',
+    '..dddd..',
+  ],
+  jam: [
+    '..dddd..',
+    '..cccc..',
+    '.cccccc.',
+    '.cddddc.',
+    '.cdccdc.',
+    '.cddddc.',
+    '.cccccc.',
+    '..dddd..',
+  ],
+  hatchet: [
+    '..cccc..',
+    '.cccccc.',
+    '..cccc..',
+    '...dd...',
+    '...dd...',
+    '...dd...',
+    '...dd...',
+    '...dd...',
+  ],
+  charm: [
+    '.d....d.',
+    '..d..d..',
+    '...dd...',
+    '..cccc..',
+    '.ccddcc.',
+    '.ccddcc.',
+    '..cccc..',
+    '...cc...',
+  ],
+  chime: [
+    '...cc...',
+    '.cccccc.',
+    '..d.d.d.',
+    '..c.c.c.',
+    '..c.c.c.',
+    '..c.c...',
+    '....c...',
+    '........',
+  ],
+  chest: [
+    '..cccc..',
+    '.cccccc.',
+    'cccccccc',
+    'cddddddc',
+    'cccdcccc',
+    'cccccccc',
+    'cddddddc',
+    'cccccccc',
+  ],
+  clock: [
+    '..cccc..',
+    '.cccccc.',
+    'ccddddcc',
+    'ccdcddcc',
+    'ccdccdcc',
+    'ccddddcc',
+    '.cccccc.',
+    '..c..c..',
+  ],
+  bark: [
+    '..cccc..',
+    '.cccccc.',
+    'cc.cc.cc',
+    'cccccccc',
+    'cc.cc.cc',
+    '.cccccc.',
+    '..cccc..',
+    '........',
+  ],
+  berry: [
+    '........',
+    '..cc.cc.',
+    '.cccccc.',
+    '.cccccc.',
+    '..cccc..',
+    '...cc...',
+    '..dddd..',
+    '........',
+  ],
+  resin: [
+    '...cc...',
+    '..cccc..',
+    '.cccccc.',
+    'cccccccc',
+    'cccccccc',
+    '.cccccc.',
+    '..cccc..',
+    '........',
+  ],
+  clay: [
+    '........',
+    '..cccc..',
+    '.cccccc.',
+    'cccccccc',
+    'cccccccc',
+    'cccccccc',
+    '.dddddd.',
+    '........',
+  ],
+  flint: [
+    '....c...',
+    '...cc c.',
+    '..cccccc',
+    '.ccccccc',
+    'ccccccc.',
+    'cccccc..',
+    '.cccc...',
+    '..c.....',
+  ],
+  honey: [
+    '..cccc..',
+    '.cccccc.',
+    'cc.cc.cc',
+    'cccccccc',
+    'cc.cc.cc',
+    '.cccccc.',
+    '..dddd..',
+    '........',
+  ],
+  ironwood: [
+    '.cc..cc.',
+    '.cc..cc.',
+    '.cccccc.',
+    '.cc..cc.',
+    '.cc..cc.',
+    '.cccccc.',
+    '.cc..cc.',
+    '........',
+  ],
+  amber: [
+    '...cc...',
+    '..cccc..',
+    '.cccccc.',
+    'ccc..ccc',
+    'ccc..ccc',
+    '.cccccc.',
+    '..cccc..',
+    '...cc...',
+  ],
 };
 
 export function nodeSprite(item, colour) {
@@ -306,21 +465,32 @@ export function itemIcon(item, colour) {
   const rows = NODE_SHAPE[item];
   if (rows) return nodeSprite(item, colour);
   // Crafted goods get a simple crate-and-lid shape in their own colour.
-  return sprite(`icon:${item}`, [
-    '........',
-    '.cccccc.',
-    '.cdddc c',
-    '.cccccc.',
-    '.cccccc.',
-    '.cdddddc',
-    '.cccccc.',
-    '........',
-  ], { c: colour, d: PAL.ink });
+  return sprite(
+    `icon:${item}`,
+    [
+      '........',
+      '.cccccc.',
+      '.cdddc c',
+      '.cccccc.',
+      '.cccccc.',
+      '.cdddddc',
+      '.cccccc.',
+      '........',
+    ],
+    { c: colour, d: PAL.ink },
+  );
 }
 
 /** Customers: the same silhouette in a different coat, so a queue reads as a
  *  queue of people rather than one person repeated. */
-const COATS = ['#c0553f', '#3f7cc0', '#5b9e4f', '#a05bc0', '#c09a3f', '#3fa8a0'];
+const COATS = [
+  '#c0553f',
+  '#3f7cc0',
+  '#5b9e4f',
+  '#a05bc0',
+  '#c09a3f',
+  '#3fa8a0',
+];
 
 const CUSTOMER = [
   '................',

@@ -5,7 +5,7 @@
  * its own prefix — cache storage is shared across the whole origin.
  */
 
-const VERSION = 'whittle-wares-arcade-20260914';
+const VERSION = 'whittle-wares-seasons-v2-20260914';
 const SHELL = './';
 
 const ASSETS = [
@@ -17,6 +17,8 @@ const ASSETS = [
   'js/main.js',
   'js/game.js',
   'js/economy.js',
+  'js/progression.js',
+  'js/save.js',
   'js/world.js',
   'js/art.js',
   'js/audio.js',
@@ -28,7 +30,10 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(VERSION).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches
+      .open(VERSION)
+      .then((cache) => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -38,10 +43,12 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((k) => k.startsWith('whittle-wares-') && k !== VERSION).map((k) => caches.delete(k))
-        )
+          keys
+            .filter((k) => k.startsWith('whittle-wares-') && k !== VERSION)
+            .map((k) => caches.delete(k)),
+        ),
       )
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -65,14 +72,16 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           const root = new URL(SHELL, self.registration.scope);
-          if (url.pathname !== root.pathname) return Response.redirect(root.href, 302);
+          if (url.pathname !== root.pathname)
+            return Response.redirect(root.href, 302);
           return (await caches.match(SHELL)) || Response.error();
-        })
+        }),
     );
     return;
   }
 
-  const critical = request.destination === 'script' || request.destination === 'style';
+  const critical =
+    request.destination === 'script' || request.destination === 'style';
   if (critical) {
     event.respondWith(
       fetch(request)
@@ -83,7 +92,7 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => caches.match(request).then((r) => r || Response.error()))
+        .catch(() => caches.match(request).then((r) => r || Response.error())),
     );
     return;
   }
@@ -100,6 +109,6 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
       return cached || network;
-    })
+    }),
   );
 });
