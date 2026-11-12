@@ -1,0 +1,19 @@
+{
+  "name": "Timber Tails · Beaver Games",
+  "short_name": "Timber Tails",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#10190f",
+  "theme_color": "#10190f",
+  "description": "A beaver kit, eight worlds and thirty-two stages between here and the lodge.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

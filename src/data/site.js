@@ -8,11 +8,11 @@
 export const SITE = {
   name: 'Beaver Games',
   description:
-    'Four free browser games. Blast space chickens, run through the forest, play pinball, or build a woodland shop. No downloads or sign-up.',
+    'Six free browser games. Blast space chickens, run through the forest, play pinball, build a woodland shop, defend the dam, or platform through thirty-two stages. No downloads or sign-up.',
   author: 'The Coop',
   locale: 'en',
   // Bump when site content meaningfully changes; feeds dateModified/lastmod.
-  updated: '2026-09-14',
+  updated: '2026-11-12',
   // Default social share image (used when a page has nothing better).
   ogImage: '/media/beaver-games-logo.png',
   ogImageAlt: 'Beaver Games logo',

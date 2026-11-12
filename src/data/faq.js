@@ -19,7 +19,7 @@ export const FAQ = [
   },
   {
     q: 'Do I need an account to play or save progress?',
-    a: 'No accounts, ever. Personal bests and settings save on this device. Chicken Attack saves between waves; Whittle & Wares saves your forest, inventory and shop as you play. Dam Defender saves battles and unlocks on this browser. Clearing browser data removes these saves. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
+    a: 'No accounts, ever. Personal bests and settings save on this device. Chicken Attack saves between waves; Whittle & Wares saves your forest, inventory and shop as you play. Dam Defender saves battles and unlocks on this browser. Timber Tails keeps every stage you have opened and saves a run at the start of each stage. Clearing browser data removes these saves. You only type a name if you post a score to the weekly leaderboard, and even that needs no sign-up.',
   },
   {
     q: 'What devices and browsers are supported?',

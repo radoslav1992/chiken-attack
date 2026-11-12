@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Timber Tails — a 32-stage woodland platformer</title>
+    <meta
+      name="description"
+      content="Run, jump and tail-slam a beaver kit home through eight worlds and thirty-two hand-drawn stages. Free in the browser, touch or keyboard, no download."
+    />
+    <meta name="theme-color" content="#10190f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Timber Tails" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="/shared/arcade.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <canvas id="game" role="img" aria-label="Game screen"></canvas>
+
+        <div id="hud" class="hud is-hidden">
+          <div class="hud-row">
+            <span id="hud-hearts" class="hud-hearts" role="img" aria-label="3 hearts">
+              <i></i><i></i><i></i>
+            </span>
+            <span class="hud-chip" title="Lives">×<b id="hud-lives">3</b></span>
+            <span class="hud-chip hud-acorn" title="Acorns"><i></i><b id="hud-acorns">0</b></span>
+            <span class="hud-chip hud-log" title="Golden logs"><i></i><b id="hud-logs">0/2</b></span>
+            <span class="hud-spacer"></span>
+            <span id="hud-stage" class="hud-stage">1-1</span>
+            <span class="hud-chip hud-time" title="Time left"><b id="hud-time">240</b></span>
+            <b id="hud-score" class="hud-score">0</b>
+            <button id="btn-pause" class="btn-pause" type="button" aria-label="Pause">❙❙</button>
+          </div>
+          <div id="boss-bar" class="boss-bar is-hidden">
+            <span id="boss-name">BRISTLE</span>
+            <div class="boss-track"><i id="boss-fill"></i></div>
+          </div>
+          <p id="toast" class="toast" aria-live="polite"></p>
+        </div>
+
+        <div id="card" class="card is-hidden" aria-live="polite">
+          <p id="card-world" class="card-world">WORLD 1 · WILLOW MEADOW</p>
+          <h2 id="card-title" class="card-title">1-1 First Steps</h2>
+          <p id="card-lives" class="card-lives">× 3</p>
+        </div>
+      </div>
+
+      <div id="pad" class="pad is-hidden">
+        <div id="pad-move" class="pad-move" role="group" aria-label="Move left or right">
+          <span class="pad-arrow" data-dir="left" aria-hidden="true">◀</span>
+          <span class="pad-arrow" data-dir="right" aria-hidden="true">▶</span>
+        </div>
+        <div class="pad-actions">
+          <button class="pad-btn pad-b" data-btn="action" type="button" aria-label="Throw pinecone">●</button>
+          <button class="pad-btn pad-d" data-btn="down" type="button" aria-label="Tail slam or drop down">▼</button>
+          <button class="pad-btn pad-a" data-btn="jump" type="button" aria-label="Jump">▲</button>
+        </div>
+      </div>
+
+      <!-- Menu -->
+      <section id="screen-menu" class="panel-wrap" aria-label="Main menu">
+        <div class="panel">
+          <p class="kicker">8 WORLDS · 32 STAGES</p>
+          <h1 class="title">TIMBER<br />TAILS</h1>
+          <ul class="verbs">
+            <li><b>Run and jump</b> — hold the jump for the full leap</li>
+            <li><b>Land on</b> snails and beetles. Not on <b class="c-hog">hedgehogs</b></li>
+            <li><b>Down in the air</b> is a tail-slam: it flattens anything and cracks crates</li>
+            <li>Every fourth stage, <b class="c-boar">Bristle</b> is waiting</li>
+          </ul>
+          <button id="btn-play" class="btn-big" type="button">▶ PLAY</button>
+          <p id="menu-progress" class="best"></p>
+          <div class="menu-row">
+            <button id="btn-select" class="btn-small" type="button">Stage select</button>
+            <button id="btn-sound" class="btn-small" type="button">♪ Sound on</button>
+            <a class="btn-small btn-link" href="/">← Arcade</a>
+          </div>
+          <details class="how">
+            <summary>Controls</summary>
+            <p>
+              <b>Keyboard</b> — arrows or A/D to move · Space, Z or ↑ to jump · ↓ or S in the air to
+              tail-slam, on a branch with jump to drop through · X to throw a pinecone · P to pause.
+            </p>
+            <p>
+              <b>Touch</b> — slide on ◀ ▶ to move · ▲ jump · ▼ tail-slam · ● pinecone. A gamepad works
+              too.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <!-- Stage select -->
+      <section id="screen-select" class="panel-wrap is-hidden" aria-label="Stage select">
+        <div class="panel panel-wide">
+          <h2 class="title-sm">STAGE SELECT</h2>
+          <p class="copy copy-dim">Clear a stage to open the next. Starting here begins a new run.</p>
+          <div id="world-list" class="world-list"></div>
+          <button id="btn-select-back" class="btn-small btn-center" type="button">← Back</button>
+        </div>
+      </section>
+
+      <!-- Pause -->
+      <section id="screen-pause" class="panel-wrap is-hidden" aria-label="Paused">
+        <div class="panel">
+          <h2 class="title-sm">PAUSED</h2>
+          <p id="pause-stage" class="copy copy-dim"></p>
+          <button id="btn-resume" class="btn-big" type="button">▶ RESUME</button>
+          <div class="menu-row menu-row-top">
+            <button id="btn-restart" class="btn-small" type="button">Retry stage · costs a life</button>
+            <button id="btn-sound-2" class="btn-small" type="button">♪ Sound on</button>
+            <button id="btn-quit" class="btn-small" type="button">Save &amp; quit</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stage clear -->
+      <section id="screen-clear" class="panel-wrap is-hidden" aria-label="Stage clear">
+        <div class="panel">
+          <p id="clear-kicker" class="kicker">STAGE CLEAR</p>
+          <h2 id="clear-title" class="title-sm">1-1 First Steps</h2>
+          <div class="result-grid">
+            <div><span>Time bonus</span><b id="clear-time">0</b></div>
+            <div><span>Heart bonus</span><b id="clear-hearts">0</b></div>
+            <div><span>Golden logs</span><b id="clear-logs">0/2</b></div>
+            <div><span>Score</span><b id="clear-score">0</b></div>
+          </div>
+          <button id="btn-next" class="btn-big" type="button">NEXT STAGE ▶</button>
+        </div>
+      </section>
+
+      <!-- Run over -->
+      <section id="screen-over" class="panel-wrap is-hidden" aria-label="Run over">
+        <div class="panel">
+          <h2 id="over-title" class="title-sm">OUT OF LIVES</h2>
+          <p id="over-note" class="copy copy-dim"></p>
+          <div class="result-grid">
+            <div><span>Score</span><b id="over-score">0</b></div>
+            <div><span>Stages cleared</span><b id="over-stages">0</b></div>
+            <div><span>Acorns</span><b id="over-acorns">0</b></div>
+            <div><span>Best</span><b id="over-best">0</b></div>
+          </div>
+          <form id="name-form" class="name-form" autocomplete="off">
+            <label class="name-label" for="name-input">Name on the board</label>
+            <div class="name-row">
+              <input
+                id="name-input"
+                class="name-input"
+                type="text"
+                maxlength="12"
+                spellcheck="false"
+                autocapitalize="characters"
+              />
+              <button id="btn-save-name" class="btn-small" type="submit">Save</button>
+            </div>
+          </form>
+          <button id="btn-again" class="btn-big" type="button">▶ TRY AGAIN</button>
+          <button id="btn-over-menu" class="btn-small btn-center" type="button">Back to the menu</button>
+        </div>
+      </section>
+    </div>
+
+    <noscript><p class="noscript-note">Timber Tails needs JavaScript to run.</p></noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
