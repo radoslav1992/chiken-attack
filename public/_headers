@@ -128,3 +128,22 @@
 
 /whittle-wares/css/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# Timber Tails
+/timber-tails/sw.js
+  Cache-Control: no-cache, must-revalidate
+
+/timber-tails/
+  Cache-Control: no-cache, must-revalidate
+
+/timber-tails/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/timber-tails/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/timber-tails/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/timber-tails/css/*
+  Cache-Control: public, max-age=0, must-revalidate

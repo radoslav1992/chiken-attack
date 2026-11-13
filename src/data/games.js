@@ -164,6 +164,40 @@ export const GAMES = [
       'Inspect the next wave, repair between battles, and choose perks that strengthen your tower mix.',
     ],
   },
+  {
+    slug: 'timber-tails',
+    title: 'Timber Tails',
+    genre: 'Platformer',
+    badge: 'NEW',
+    playable: true,
+    playPath: '/timber-tails/',
+    art: '/media/timber-tails-card.png',
+    stageArt: '/media/timber-tails-stage.png',
+    icon: '/timber-tails/icon.svg',
+    tagline: '8 worlds · 32 stages',
+    blurb: 'Run, jump and tail-slam a beaver kit home. Eight worlds, thirty-two hand-drawn stages, one very cross boar.',
+    about: [
+      'Pip the beaver kit has been washed a long way downstream, and the lodge is eight worlds off: meadow, burrow, marsh, pine tops, frost, embers, a storm gorge and a moonlit mill. Each world is four stages and each brings its own trouble — bats that drop from the roof, pike that leap from the reeds, rafts and lifts, ice that will not let you stop, geysers on a timer, saw blades on a rail. Land on most things to be rid of them. Not hedgehogs: those need a tail-slam, which is down in mid-air, and which also cracks crates and shakes loose whatever a stash is holding.',
+      'Every fourth stage ends in an arena with Bristle the boar, who learns a new trick every couple of worlds. You have three hearts, three lives and a checkpoint in every stage; a hundred acorns buys another life. Golden logs are hidden off the obvious route for anyone who wants all of them. Stages you have opened stay open on this browser, and a run in progress is saved at the start of each stage.',
+    ],
+    stats: { rating: '—', size: '0.2 MB', runTime: '2–3 min a stage', players: '1' },
+    meta: { developer: 'The Coop', released: 'Nov 2026', releasedISO: '2026-11', genreLine: 'Platformer · 32 stages' },
+    capabilities: ['Touch', 'Keyboard', 'Gamepad', 'Offline', 'Saves', 'No ads'],
+    controls: [
+      { key: '← →', desc: 'Run — arrows or A/D, or slide on the touch pad' },
+      { key: 'SPACE', desc: 'Jump. Hold for the full leap, tap for a hop' },
+      { key: '↓', desc: 'In the air: tail-slam. On a branch, with jump: drop through' },
+      { key: 'X', desc: 'Throw a pinecone, once you have found some' },
+      { key: 'P', desc: 'Pause' },
+    ],
+    tips: [
+      'Hedgehogs cannot be landed on. Tail-slam beside them, or throw a pinecone.',
+      'Slam a stash from above or bump it from below — either pays out.',
+      'Bristle only hurts himself. Trail him to the wall, then land on him while he sees stars.',
+      'Chain landings without touching the ground and each is worth double the last.',
+      'A golden log is usually one jump above the path you were about to take.',
+    ],
+  },
 ];
 
 export const PLAYABLE = GAMES.filter((g) => g.playable);

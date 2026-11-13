@@ -843,6 +843,10 @@ button {
     margin-top: 24px;
   }
   .stage {
+    /* The height decides the size here. Left on, the 3:4 ratio turns that
+       height into a width wider than a tall phone, and the right-hand edge of
+       every game — where the buttons are — ends up off screen. */
+    aspect-ratio: auto;
     min-height: 440px;
     height: 68svh;
     max-height: 760px;

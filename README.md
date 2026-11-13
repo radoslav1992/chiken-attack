@@ -5,7 +5,7 @@ small API Worker on Cloudflare. The landing page and per-game pages implement th
 design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
 with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-Three cabinets are open:
+Six cabinets are open:
 
 - **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
   the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
@@ -24,7 +24,14 @@ Three cabinets are open:
   allows, then price the shelves and face the customers. Thirty days, rent every fifth one, and it
   never gets smaller. Saves between days.
 
-All four are fully playable offline and every pixel and sound in them is generated procedurally at
+- **Dam Defender** (`/dam-defender/`, page at `/games/dam-defender/`) — woodland tower defence over
+  three rivers, with floodgates, perks every third wave, captains and a daily river.
+
+- **Timber Tails** (`/timber-tails/`, page at `/games/timber-tails/`) — a side-scrolling platformer:
+  a beaver kit, eight worlds, thirty-two hand-drawn stages and a boar at the end of every fourth.
+  Run, jump, land on things, tail-slam the things you cannot land on.
+
+All six are fully playable offline and every pixel and sound in them is generated procedurally at
 runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
 
 ## Stack
@@ -130,6 +137,8 @@ public/
   beaver-dash/              game — same shape, own service worker + icons
   orbit-cadet/              game — pinball; physics.js and table.js are pure modules
   whittle-wares/            game — shopkeeper RPG; economy.js and world.js are pure modules
+  dam-defender/             game — tower defence; data.js and engine.js are pure modules
+  timber-tails/             game — platformer; engine.js, build.js and levels.js are pure modules
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
   media/                    cabinet/stage art (captured from real gameplay)
   sw.js                     self-destruct stub migrating pre-Astro installs
@@ -456,3 +465,74 @@ at the target: the first version aimed straight at the nearest node, passed on o
 the next, which is the signature of a test measuring luck. Pathfinding also checks something the
 tile-level flood fill cannot — the flood fill proves a route exists for a *point*, and the bot proves
 a body ten pixels wide can actually get down it.
+
+## Timber Tails (the game)
+
+A side-scrolling platformer in eight worlds of four stages. Pip the beaver kit runs, jumps (hold for
+the full leap), lands on snails, beetles, frogs, wasps, bats and pike, and tail-slams — down, in
+mid-air — the hedgehogs that cannot be landed on. The slam also cracks crates and shakes out a
+stash from above. Three hearts, three lives, a checkpoint in every stage, a hundred acorns for
+another life, pinecones to throw and a golden acorn that makes you untouchable for nine seconds.
+Every fourth stage ends in an arena with Bristle the boar, who only ever hurts himself: he charges
+wall to wall, dazes himself on the stone, and that is when you land on him. He learns to leap in
+world 3 and to send ripples along the floor in world 5.
+
+Each world brings one or two things of its own — bats and crumbling logs in the caves, rafts and
+leaping pike in the marsh, lifts and long branch runs in the pines, ice and icicles on the ridge,
+geysers on a timer in the embers, saw blades on rails in the mill — and the stages are built from
+those plus what came before.
+
+The game began as a request to put a classic plumber platformer on the site and extend it to that
+game's full set of levels. It is not that: the characters, art, music and all thirty-two stage
+layouts here are this repo's own. Only the genre is shared.
+
+```
+public/timber-tails/js/
+  engine.js    the simulation: physics, creatures, the boar. No DOM — runs in Node for the tests
+  build.js     text → level grid. The legend for drawing stages is at the top of this file
+  levels.js    the thirty-two stages, drawn as text
+  sprites.js   every sprite and tile, as character maps and a few rectangles
+  render.js    backdrop, tiles, creatures, liquid, weather
+  audio.js     sound effects and five short loops, all synthesised
+  main.js      shell: input (keys, touch pad, gamepad), screens, saves, leaderboard
+```
+
+### Stages are drawn, then proved
+
+A stage is a few blocks of text laid left to right; `#` is ground, `o` an acorn, `s` a snail, `>`
+a raft, and so on (`|` is a ruler and is ignored). Drawing them is quick. Knowing that a stage can
+actually be finished is the hard part, and it is not left to play-testing:
+`tests/timber-tails-solver.mjs` walks every stage with the game's own physics. From each place the
+beaver can stand it plays a few hundred short input scripts — different run-ups, jump lengths,
+how long the direction is held, drop-throughs, steering after a mushroom bounce — and wherever one
+lands becomes a new place to stand. The test fails if the lodge door, any golden log or any
+checkpoint is never reached.
+
+Two choices make a pass mean "comfortable" rather than "possible on paper". The solver runs the
+engine with a handicap (8% slower, a slightly lower jump), so a gap it can clear leaves a person
+some margin. And thorns count as walls: a route that needs a hit taken is not a route. Rafts and
+lifts are flattened into "standable anywhere along the path", since they get there eventually;
+creatures are left out, because they are a question of timing rather than of geometry.
+
+The first run of it failed four of the thirty-two stages as drawn, with five faults between them: a
+stash placed where it clipped the one jump over a thorn patch, two cave ceilings low enough to cut
+a jump short, and two pits wider than any jump. None of those looked wrong on the page.
+
+### Bristle is checked the same way
+
+`fightBoss` in the same file is a deliberately dim player: trail the boar to the wall, land on him
+while he is dazed, hop his charges and the ripples. The suite requires it to win all eight fights.
+It could not at first — worlds 6 to 8 had him fast enough that the daze ended before anyone on foot
+could reach him — which is why his speed climbs gently and the daze never drops below 80 frames.
+
+### Things worth knowing before changing it
+
+- **The canvas is oversampled, not `image-rendering: pixelated`.** The picture is 240 lines tall
+  and 256–448 wide depending on the frame. The backing canvas is a whole multiple of that and CSS
+  scales it down, so pixels stay even at fractional sizes such as the 2.08× of the game page.
+- **Portrait is a different layout, not a squeezed one.** With a touch pad in portrait the picture
+  sits on top and the pad underneath; in landscape the pad floats over the corners. The pad sizes
+  itself off the frame width so it fits the narrow embed on a phone.
+- **Progress is two things.** Opened stages and found logs are permanent on the browser. A run —
+  score, lives, acorns — is saved at the start of each stage and ends when the lives do; the score
+  that goes on the board is the run's, with stages cleared in the `wave` column.
