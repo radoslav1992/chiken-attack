@@ -5,7 +5,7 @@ small API Worker on Cloudflare. The landing page and per-game pages implement th
 design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
 with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-Six cabinets are open:
+Seven cabinets are open:
 
 - **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
   the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
@@ -31,8 +31,13 @@ Six cabinets are open:
   a beaver kit, eight worlds, thirty-two hand-drawn stages and a boar at the end of every fourth.
   Run, jump, land on things, tail-slam the things you cannot land on.
 
-All six are fully playable offline and every pixel and sound in them is generated procedurally at
-runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
+- **Freedoom** (`/freedoom/`, page at `/games/freedoom/`) — not ours. This is
+  [Freedoom: Phase 2](https://freedoom.github.io/), the free and open-source first-person shooter,
+  running unmodified on an open-source engine compiled to WebAssembly. Hosted here, credited there.
+
+All seven are playable offline. The first six are the arcade's own, and every pixel and sound in
+them is generated procedurally at runtime (Canvas2D + Web Audio) — the repo ships no image or
+audio assets for their gameplay. Freedoom is the exception: it brings its own 11 MB data file.
 
 ## Stack
 
@@ -172,6 +177,7 @@ public/
   whittle-wares/            game — shopkeeper RPG; economy.js and world.js are pure modules
   dam-defender/             game — tower defence; data.js and engine.js are pure modules
   timber-tails/             game — platformer; engine.js, build.js and levels.js are pure modules
+  freedoom/                 hosted game — WebAssembly engine, game data, licences, upstream source
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
   media/                    cabinet/stage art (captured from real gameplay), as WebP
   media/og/                 1200x630 share images, one per page (tools/make-og-images.mjs)
@@ -183,6 +189,7 @@ tools/make-beaver-icons.mjs Beaver Dash icon set
 tools/make-orbit-icons.mjs  Orbit Cadet icon set
 tools/make-whittle-icons.mjs Whittle & Wares icon set  (npm run icons runs all four)
 tools/make-og-images.mjs    share images for link previews (needs Playwright; see the file)
+tools/freedoom/             the engine port: patch, browser layer, build script (GPL)
 ```
 
 ## The brand mark
@@ -574,3 +581,49 @@ could reach him — which is why his speed climbs gently and the daze never drop
 - **Progress is two things.** Opened stages and found logs are permanent on the browser. A run —
   score, lives, acorns — is saved at the start of each stage and ends when the lives do; the score
   that goes on the board is the run's, with stages cleared in the `wave` column.
+
+## Freedoom (the hosted one)
+
+Everything else in the arcade was written here. This was not, and the difference matters enough
+to spell out.
+
+**What it is.** [Freedoom: Phase 2](https://freedoom.github.io/) is a complete first-person
+shooter made by volunteers over twenty years: thirty-two levels, with its own monsters, weapons,
+art, sound and music, under a BSD licence. It runs on the engine id Software released as open
+source, here in the form of [Crispy Doom](https://github.com/fabiangreffrath/crispy-doom) 6.0.
+`public/freedoom/` is that engine compiled to WebAssembly, the Freedoom data file unmodified, and
+a page around them.
+
+**What it is not.** It is not id Software's game and contains none of it: no levels, art, sound
+or music from the commercial games are in this repository, and the page does not present
+Freedoom as anything but Freedoom. `tests/freedoom.test.mjs` checks the data file is the Freedoom
+release (by hash and by its marker lump) and that the catalog copy does not market it as
+something else.
+
+**Licences, and what they oblige.**
+
+- The engine is GPL-2.0. Anyone who receives the binary is entitled to the source, so the
+  upstream tarball is served from `public/freedoom/source/`, the changes live in
+  `tools/freedoom/`, and `public/freedoom/licenses/SOURCE.txt` says how the two fit together.
+  The browser layer in `tools/freedoom/web/` is GPL too, as a derived work.
+- Freedoom is BSD-3-Clause: redistribute freely, keep the notice. The licence and the full
+  credits are in `public/freedoom/licenses/` and linked from the start screen.
+- The rest of this repository is unaffected. The engine is a separate program that the page
+  loads; nothing of the arcade's is linked into it.
+
+**How it differs from the other cabinets.**
+
+- It is 12 MB, not 0.1. The service worker fetches only the page up front; the engine and data
+  are cached the first time someone presses Play.
+- It needs `'wasm-unsafe-eval'` in the site's Content-Security-Policy, which is why `_headers`
+  now has it. That permits compiling a `.wasm` file and nothing else: no `eval`, no inline
+  script. The engine is built with `DYNAMIC_EXECUTION=0` so it asks for no more than that, and
+  the test suite checks both halves.
+- The game keeps its own saves and settings (in IndexedDB, through the engine's file system),
+  not through the arcade's code.
+- It has no score of its own. The engine reports when a level ends and when the player dies
+  (`web_events.c`), and `public/freedoom/js/score.js` turns that into the number that goes on the
+  board: kills, secrets, pace, and the skill level as a multiplier.
+- Fire is on F and the mouse, not Ctrl. Ctrl+W closes a browser tab and no page can prevent it.
+
+`tools/freedoom/README.md` covers the port itself and how to rebuild it.

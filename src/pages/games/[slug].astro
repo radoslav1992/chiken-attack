@@ -17,6 +17,11 @@ const { game } = Astro.props;
 const related = PLAYABLE.filter((g) => g.slug !== game.slug);
 
 const orgId = new URL("/#organization", Astro.site).href;
+// Most games here are the arcade's own. One that is hosted rather than made
+// here names its real author, so the markup never claims someone else's work.
+const author = game.author
+  ? { "@type": "Organization", name: game.author.name, url: game.author.url }
+  : { "@id": orgId };
 const pageUrl = new URL(`/games/${game.slug}/`, Astro.site).href;
 // Typed as both: VideoGame says what it is, WebApplication is the type search
 // engines read the "free, runs in a browser" facts from.
@@ -41,7 +46,7 @@ const schema = [
     isAccessibleForFree: true,
     datePublished: game.meta.releasedISO,
     dateModified: SITE.updated,
-    author: { "@id": orgId },
+    author,
     publisher: { "@id": orgId },
     offers: {
       "@type": "Offer",

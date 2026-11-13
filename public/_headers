@@ -10,7 +10,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
   Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; media-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'self'
 
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
@@ -147,3 +147,31 @@
 
 /timber-tails/css/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# Freedoom. The engine is WebAssembly, which is why the policy at the top of
+# this file carries 'wasm-unsafe-eval': it permits compiling a .wasm file and
+# nothing else (no eval, no inline script).
+/freedoom/sw.js
+  Cache-Control: no-cache, must-revalidate
+
+/freedoom/
+  Cache-Control: no-cache, must-revalidate
+
+/freedoom/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/freedoom/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/freedoom/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/freedoom/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/freedoom/engine/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# 11 MB and it only changes when the game's version does (and so its name).
+/freedoom/data/*
+  Cache-Control: public, max-age=604800

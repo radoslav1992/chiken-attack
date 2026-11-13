@@ -12,7 +12,7 @@ export const SITE = {
   title: 'Beaver Games — free browser games, no download, no ads',
   // Under 160 characters, or search results cut it off mid-sentence.
   description:
-    'Free browser games that load in seconds: space shooter, endless runner, pinball, shopkeeper RPG, tower defence and platformer. No download, no sign-up, no ads.',
+    'Free browser games: space shooter, first-person shooter, endless runner, pinball, shopkeeper RPG, tower defence and platformer. No install, no sign-up, no ads.',
   author: 'The Coop',
   locale: 'en',
   // Bump when site content meaningfully changes; feeds dateModified/lastmod.

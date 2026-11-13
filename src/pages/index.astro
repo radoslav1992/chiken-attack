@@ -30,7 +30,9 @@ const schema = [
         playMode: "SinglePlayer",
         applicationCategory: "Game",
         datePublished: g.meta.releasedISO,
-        author: { "@id": orgId },
+        author: g.author
+          ? { "@type": "Organization", name: g.author.name, url: g.author.url }
+          : { "@id": orgId },
         offers: {
           "@type": "Offer",
           price: "0",

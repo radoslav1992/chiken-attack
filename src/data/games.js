@@ -247,6 +247,51 @@ export const GAMES = [
       'A golden log is usually one jump above the path you were about to take.',
     ],
   },
+  {
+    slug: 'freedoom',
+    title: 'Freedoom',
+    genre: 'Shooter',
+    badge: 'NEW',
+    playable: true,
+    playPath: '/freedoom/',
+    art: '/media/freedoom-card.webp',
+    stageArt: '/media/freedoom-stage.webp',
+    icon: '/freedoom/icon.svg',
+    tagline: 'Phase 2 · 32 levels',
+    seo: {
+      title: 'Freedoom — free first-person shooter online | Beaver Games',
+      description:
+        'Play Freedoom: Phase 2 free in your browser: the open-source first-person shooter with 32 levels. Mouse and keyboard, touch or gamepad. Nothing to install.',
+    },
+    share: 'The free, open-source first-person shooter. Thirty-two levels.',
+    ogImage: '/media/og/freedoom.jpg',
+    // Not ours: this one is the Freedoom project's game, hosted here. The
+    // game page credits them, and the structured data names them as author.
+    author: { name: 'The Freedoom project', url: 'https://freedoom.github.io/' },
+    blurb: 'The free, open-source first-person shooter. Thirty-two levels of corridors, keys and things that want you dead.',
+    about: [
+      'Freedoom: Phase 2 is a complete first-person shooter made by volunteers and given away: its own thirty-two levels, its own monsters, weapons, art and music, all under a free licence. This is that game, unmodified, running in a browser tab. Find the keys, open the doors, mind your ammunition, and look for the walls that are not quite walls.',
+      'It runs on Crispy Doom, an open-source engine, compiled to WebAssembly for this page. The first play downloads about 12 MB; after that it works offline. The game keeps its own saves and settings on this device, in the menu under Save Game and Options. The arcade adds one thing the game does not have, a score: points for each level finished, more for kills, secrets and speed, and more again on the harder skill levels. A run ends when you die.',
+    ],
+    stats: { rating: '—', size: '12 MB', runTime: '5–15 min a level', players: '1' },
+    meta: { developer: 'Freedoom project', released: '2024 · v0.13', releasedISO: '2024', genreLine: 'Shooter · First-person' },
+    capabilities: ['Mouse', 'Keyboard', 'Touch', 'Gamepad', 'Offline', 'Saves', 'Open source'],
+    controls: [
+      { key: 'W A S D', desc: 'Move and strafe · arrow keys also move and turn' },
+      { key: 'MOUSE', desc: 'Turn. Click the game first to capture the pointer' },
+      { key: 'CLICK', desc: 'Fire · F on the keyboard' },
+      { key: 'E', desc: 'Open doors and press switches · Space does the same' },
+      { key: '1–7', desc: 'Change weapon · or the mouse wheel' },
+      { key: 'ESC', desc: 'Menu: save, load, options, skill level' },
+    ],
+    tips: [
+      'Save often. It is in the menu, and it is not cheating.',
+      'A wall with a slightly different texture is worth pressing Use on.',
+      'Strafing around a corner beats walking round it face first.',
+      'Score counts kills, secrets and pace, and doubles on the hardest skill.',
+      'On a phone, turn it sideways: the picture gets much bigger.',
+    ],
+  },
 ];
 
 export const PLAYABLE = GAMES.filter((g) => g.playable);
