@@ -27,6 +27,7 @@
       <div id="stage">
         <canvas id="screen" role="img" aria-label="Game screen" width="640" height="400"></canvas>
         <div id="topbar" class="topbar is-hidden">
+          <span id="dl" class="chip-btn chip-note is-hidden" role="status"></span>
           <button id="btn-menu" class="chip-btn" type="button" aria-label="Game menu">☰ Menu</button>
           <button id="btn-sound" class="chip-btn" type="button">♪ Sound on</button>
         </div>
@@ -76,7 +77,7 @@
           <div id="progress" class="progress is-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
             <i id="progress-fill"></i>
           </div>
-          <p id="load-note" class="best">About 12 MB to download the first time. Saves stay on this device.</p>
+          <p id="load-note" class="best">Starts after about 2 MB. The rest of the game, 8 MB in all, downloads while you play. Saves stay on this device.</p>
           <div class="menu-row">
             <button id="btn-sound-menu" class="btn-small" type="button">♪ Sound on</button>
             <a class="btn-small btn-link" href="/">← Arcade</a>

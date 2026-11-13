@@ -15,11 +15,15 @@ Here it is.
 
 2. The changes made for the browser
    https://github.com/radoslav1992/chiken-attack/tree/main/tools/freedoom
-   - crispy-doom-6.0-web.patch   small changes to four engine files
+   - crispy-doom-6.0-web.patch   small changes to seven engine files
    - web/                        the browser platform layer: video, input,
-                                 sound effects, music and stand-ins for the
-                                 parts of SDL2 the engine expects
+                                 sound effects, music, on-demand game data
+                                 and stand-ins for the parts of SDL2 the
+                                 engine expects
+   - lzma/                       the LZMA decoder from the LZMA SDK by Igor
+                                 Pavlov, which is in the public domain
    - build.sh                    the build script
+   - make-packs.py               cuts the game data into the files in data/
    - README.md                   how to rebuild, step by step
    These files are under the GNU General Public License, version 2 or later.
 
@@ -29,9 +33,13 @@ run build.sh. README.md has the exact commands.
 The game data
 =============
 
-data/freedoom2.wad.gz is Freedoom: Phase 2, version 0.13.0, compressed with
-gzip and otherwise unmodified. It is distributed under a BSD licence
-(COPYING-FREEDOOM.txt); its source is at https://github.com/freedoom/freedoom
+The files in data/ are Freedoom: Phase 2, version 0.13.0 (freedoom2.wad), cut
+into pieces so that the game can start before all of it has downloaded, and
+compressed with LZMA. Nothing in it is changed: put back together in the order
+packs.json gives, the pieces are the original file exactly, and
+tools/freedoom/make-packs.py in the repository above will do that for you
+("unpack"). It is distributed under a BSD licence (COPYING-FREEDOOM.txt); its
+source is at https://github.com/freedoom/freedoom
 
 The page around the game
 ========================

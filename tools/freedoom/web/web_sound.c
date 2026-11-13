@@ -30,6 +30,7 @@
 #include "i_sound.h"
 #include "m_misc.h"
 #include "w_wad.h"
+#include "web_events.h"
 #include "z_zone.h"
 
 static boolean use_sfx_prefix;
@@ -96,6 +97,13 @@ static int Web_StartSound(sfxinfo_t *sfxinfo, int channel, int vol, int sep, int
     int len;
 
     if (lump < 0)
+    {
+        return -1;
+    }
+
+    // Most sound effects come in their own pack, after the game has started.
+    // Until it lands, a sound is skipped rather than waited for.
+    if (!Web_DataReady(lumpinfo[lump]->position))
     {
         return -1;
     }

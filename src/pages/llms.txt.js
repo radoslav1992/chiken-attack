@@ -26,7 +26,7 @@ export function GET(context) {
 Key facts:
 
 - All games are free forever — no tiers, no in-app purchases, no ads.
-- Nothing to install: the arcade's own games are web pages under 0.5 MB each. Freedoom, a hosted open-source shooter, downloads about 12 MB the first time it is played. Optional PWA install.
+- Nothing to install: the arcade's own games are web pages under 0.5 MB each. Freedoom, a hosted open-source shooter, starts after about 2 MB and downloads the rest of its 8 MB while it is played. Optional PWA install.
 - Works offline via per-game service workers; saves live on the device, no accounts.
 - Weekly leaderboards reset every Monday at 00:00 UTC.
 - Content last updated: ${SITE.updated}.

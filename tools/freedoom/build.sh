@@ -19,7 +19,7 @@ SKIP="i_video.c i_videohr.c i_input.c i_joystick.c i_endoom.c i_cdmus.c i_flmusi
       w_file_win32.c w_file_posix.c z_native.c"
 
 FILES=""
-for f in "$SRC"/src/*.c "$SRC"/src/doom/*.c "$SRC"/opl/opl.c "$SRC"/opl/opl3.c "$SRC"/opl/opl_queue.c "$HERE"/web/*.c; do
+for f in "$SRC"/src/*.c "$SRC"/src/doom/*.c "$SRC"/opl/opl.c "$SRC"/opl/opl3.c "$SRC"/opl/opl_queue.c "$HERE"/web/*.c "$HERE"/lzma/LzmaDec.c; do
   base=$(basename "$f")
   case " $(echo $SKIP) " in *" $base "*) continue ;; esac
   FILES="$FILES $f"
@@ -28,7 +28,7 @@ done
 # -Dmain=doom_main: this Emscripten (3.1.6 with clang 15) does not export a
 # main() that takes arguments, so the engine's is renamed and web_input.c
 # exports web_main() to call it.
-CFLAGS="-O2 -DHAVE_CONFIG_H -Dmain=doom_main -I$HERE/web -I$SRC/src -I$SRC/src/doom -I$SRC/opl -I$SRC/pcsound
+CFLAGS="-O2 -DHAVE_CONFIG_H -Dmain=doom_main -I$HERE/web -I$HERE/lzma -I$SRC/src -I$SRC/src/doom -I$SRC/opl -I$SRC/pcsound
         -Wno-unused-result -Wno-pointer-sign -Wno-parentheses -Wno-unknown-warning-option"
 
 export OBJ CFLAGS
@@ -46,7 +46,7 @@ fi
 # take. Native code shrugs; WebAssembly traps. This makes it shrug too.
 emcc -O2 "$OBJ"/*.o -o "$OUT/freedoom.js" \
   -sASYNCIFY -sASYNCIFY_STACK_SIZE=65536 \
-  -sASYNCIFY_IMPORTS='["js_wait_frame"]' \
+  -sASYNCIFY_IMPORTS='["js_wait_frame","js_ensure_level"]' \
   -sDYNAMIC_EXECUTION=0 \
   -sEMULATE_FUNCTION_POINTER_CASTS=1 \
   -sINITIAL_MEMORY=134217728 -sALLOW_MEMORY_GROWTH=1 \

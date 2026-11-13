@@ -1,6 +1,6 @@
 diff -ruN a/src/doom/g_game.c b/src/doom/g_game.c
 --- a/src/doom/g_game.c	2023-03-31 20:42:24.000000000 +0000
-+++ b/src/doom/g_game.c	2026-11-13 07:52:12.838077083 +0000
++++ b/src/doom/g_game.c	2026-11-13 08:41:17.815338118 +0000
 @@ -75,6 +75,10 @@
  
  
@@ -48,6 +48,21 @@ diff -ruN a/src/doom/g_game.c b/src/doom/g_game.c
      if (paused)
      {
  	paused = false;
+@@ -2906,6 +2925,14 @@
+  
+ void G_DeferedPlayDemo(const char *name)
+ { 
++#ifdef __EMSCRIPTEN__
++    // [web] The title screen's demos each need a whole level loaded, and the
++    // levels arrive on demand. Fetching three of them so that nobody can
++    // watch the menu's background is a poor trade; the title and credit
++    // pages simply cycle instead.
++    return;
++#endif
++
+     defdemoname = name; 
+     gameaction = ga_playdemo; 
+ 
 diff -ruN a/src/doom/p_inter.c b/src/doom/p_inter.c
 --- a/src/doom/p_inter.c	2023-03-31 20:42:24.000000000 +0000
 +++ b/src/doom/p_inter.c	2026-11-13 07:52:12.838684094 +0000
@@ -75,6 +90,85 @@ diff -ruN a/src/doom/p_inter.c b/src/doom/p_inter.c
  	P_DropWeapon (target->player);
  	// [crispy] center view when dying
  	target->player->centering = true;
+diff -ruN a/src/doom/p_setup.c b/src/doom/p_setup.c
+--- a/src/doom/p_setup.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/p_setup.c	2026-11-13 08:41:17.805821789 +0000
+@@ -1118,6 +1118,15 @@
+     boolean	crispy_validblockmap;
+     mapformat_t	crispy_mapformat;
+ 	
++#ifdef __EMSCRIPTEN__
++    // [web] this level's data may still be on its way: wait for it here,
++    // before anything below tries to read it
++    {
++        extern void Web_EnsureLevel(int map);
++        Web_EnsureLevel(map);
++    }
++#endif
++
+     totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
+     // [crispy] count spawned monsters
+     extrakills = 0;
+diff -ruN a/src/doom/r_data.c b/src/doom/r_data.c
+--- a/src/doom/r_data.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/r_data.c	2026-11-13 08:41:17.816209033 +0000
+@@ -155,6 +155,19 @@
+ unsigned**		texturecolumnofs; // [crispy] column offsets for composited translucent mid-textures on 2S walls
+ unsigned**		texturecolumnofs2; // [crispy] column offsets for composited opaque textures
+ byte**			texturecomposite; // [crispy] composited translucent mid-textures on 2S walls
++
++#ifdef __EMSCRIPTEN__
++// [web] R_GenerateLookup() reads every patch a texture is made of. Done for
++// all textures at startup, that is the whole 10 MB of wall art before the
++// title screen. Done the first time each texture is asked for, it is only
++// the art a level really uses.
++void R_GenerateLookup (int texnum);
++static byte *texturelookupdone;
++#define R_EnsureLookup(tex) \
++    do { if (!texturelookupdone[tex]) { texturelookupdone[tex] = 1; R_GenerateLookup(tex); } } while (0)
++#else
++#define R_EnsureLookup(tex)
++#endif
+ byte**			texturecomposite2; // [crispy] composited opaque textures
+ const byte**	texturebrightmap; // [crispy] brightmaps
+ 
+@@ -602,6 +615,7 @@
+     int		ofs;
+ 	
+     col &= texturewidthmask[tex];
++    R_EnsureLookup(tex);
+     ofs = texturecolumnofs2[tex][col];
+ 
+     if (!texturecomposite2[tex])
+@@ -622,6 +636,7 @@
+ 	col += texturewidth[tex];
+ 
+     col %= texturewidth[tex];
++    R_EnsureLookup(tex);
+     ofs = texturecolumnofs[tex][col];
+ 
+     if (!texturecomposite[tex])
+@@ -984,8 +999,12 @@
+     
+     // Precalculate whatever possible.	
+ 
++#ifdef __EMSCRIPTEN__
++    texturelookupdone = calloc(numtextures, 1); // [web] built on first use
++#else
+     for (i=0 ; i<numtextures ; i++)
+ 	R_GenerateLookup (i);
++#endif
+     
+     // Create translation table for global animation.
+     texturetranslation = Z_Malloc ((numtextures+1)*sizeof(*texturetranslation), PU_STATIC, 0);
+@@ -1420,6 +1439,7 @@
+ 	    continue;
+ 
+ 	// [crispy] precache composite textures
++	R_EnsureLookup(i);
+ 	R_GenerateComposite(i);
+ 
+ 	texture = textures[i];
 diff -ruN a/src/i_sound.c b/src/i_sound.c
 --- a/src/i_sound.c	2023-03-31 20:42:24.000000000 +0000
 +++ b/src/i_sound.c	2026-11-13 07:44:51.974012792 +0000
@@ -100,6 +194,35 @@ diff -ruN a/src/i_sound.c b/src/i_sound.c
      NULL,
  };
  
+diff -ruN a/src/w_file.c b/src/w_file.c
+--- a/src/w_file.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/w_file.c	2026-11-13 08:41:17.803781161 +0000
+@@ -37,11 +37,25 @@
+     &stdc_wad_file,
+ };
+ 
++#ifdef __EMSCRIPTEN__
++// [web] The game data is not a file on disk; see web/web_wad.c.
++extern wad_file_class_t web_wad_file;
++#endif
++
+ wad_file_t *W_OpenFile(const char *path)
+ {
+     wad_file_t *result;
+     int i;
+ 
++#ifdef __EMSCRIPTEN__
++    result = web_wad_file.OpenFile(path);
++
++    if (result != NULL)
++    {
++        return result;
++    }
++#endif
++
+     //!
+     // @category obscure
+     //
 diff -ruN a/opl/opl.c b/opl/opl.c
 --- a/opl/opl.c	2023-03-31 20:42:24.000000000 +0000
 +++ b/opl/opl.c	2026-11-13 07:45:22.711646836 +0000

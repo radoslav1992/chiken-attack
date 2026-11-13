@@ -172,6 +172,11 @@
 /freedoom/engine/*
   Cache-Control: public, max-age=0, must-revalidate
 
-# 11 MB and it only changes when the game's version does (and so its name).
+# The list of packs: small, and it must be fresh, since it names the packs.
+/freedoom/packs.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The packs themselves. Each file is named after a hash of its contents, so
+# a changed pack is a new URL and these can be kept for a long time.
 /freedoom/data/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=31536000, immutable

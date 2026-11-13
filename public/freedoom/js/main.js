@@ -6,9 +6,14 @@
  * needs from one goes through the `Module` object below:
  *
  *   it calls us   webPresent (a frame), webSfx* (sound effects), webEvent
- *                 (level finished, player died), quit
+ *                 (level finished, player died), webEnsureLevel (wait for a
+ *                 level's data), quit
  *   we call it    _web_main (start), _web_key / _web_mouse_* (input),
- *                 _web_opl_render (the next block of music), _web_wants_mouse
+ *                 _web_opl_render (the next block of music), _web_wants_mouse,
+ *                 _web_wad_* and _web_lzma_decode (hand over game data)
+ *
+ * The game data comes in packs rather than one file: see "loading" below and
+ * tools/freedoom/make-packs.py.
  *
  * This file is the arcade's own code. The engine and the game data have their
  * own licences; see the Credits section on the start screen.
@@ -529,12 +534,14 @@ function updateHint() {
 }
 
 let toastTimer = 0;
-function toast(text) {
+/* `sticky` true keeps it up until toast(.., false) takes it down again. */
+function toast(text, sticky) {
   const el = $('#toast');
+  clearTimeout(toastTimer);
+  if (sticky === false) return el.classList.remove('is-live');
   el.textContent = text;
   el.classList.add('is-live');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('is-live'), 2600);
+  if (!sticky) toastTimer = setTimeout(() => el.classList.remove('is-live'), 2600);
 }
 
 function tick() {
@@ -696,7 +703,15 @@ $('#name-form').addEventListener('submit', (e) => {
 
 /* ---------------------------------------------------------------- loading -- */
 
-const WAD_BYTES = 10933271; // size of data/freedoom2.wad.gz, for the progress bar
+/* The game is 29 MB of data, cut into 35 packs (tools/freedoom/make-packs.py).
+ * Only the first, "core", is needed to reach the title screen. The rest come
+ * in behind it while the player is busy: level 1 and the sound effects first,
+ * then every other level in order. If the player gets to a level before its
+ * packs do, the engine asks (webEnsureLevel) and waits. */
+
+let manifest = null;
+const downloads = []; // pack index -> Promise of its compressed bytes
+let engineReady = null; // resolves once the engine can take packs
 
 function setProgress(fraction, note) {
   const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
@@ -705,25 +720,130 @@ function setProgress(fraction, note) {
   if (note) $('#load-note').textContent = note;
 }
 
-async function fetchGameData() {
-  if (typeof DecompressionStream === 'undefined')
-    throw new Error('This browser is too old to unpack the game data. Any current browser will do.');
-  const res = await fetch('data/freedoom2.wad.gz');
-  if (!res.ok) throw new Error(`The game data did not download (${res.status}).`);
-  const total = Number(res.headers.get('content-length')) || WAD_BYTES;
-  const reader = res.body.getReader();
-  const parts = [];
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    parts.push(value);
-    got += value.length;
-    setProgress((got / total) * 0.9, `Downloading the game… ${(got / 1048576).toFixed(1)} MB`);
+const mb = (bytes) => (bytes / 1e6).toFixed(1);
+const packReady = (i) => !!M && M._web_wad_is_ready(i) === 1;
+
+function downloadPack(i, onProgress) {
+  if (downloads[i]) return downloads[i];
+  const pack = manifest.packs[i];
+  const job = (async () => {
+    const res = await fetch(`data/${pack.file}`);
+    if (!res.ok) throw new Error(`The game data did not download (${res.status}).`);
+    if (!onProgress || !res.body) return new Uint8Array(await res.arrayBuffer());
+    const reader = res.body.getReader();
+    const bytes = new Uint8Array(pack.bytes);
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (got + value.length > bytes.length) throw new Error('The game data is not the size it should be.');
+      bytes.set(value, got);
+      got += value.length;
+      onProgress(got, pack.bytes);
+    }
+    if (got !== pack.bytes) throw new Error('The game data arrived incomplete.');
+    return bytes;
+  })();
+  downloads[i] = job;
+  job.catch(() => {
+    if (downloads[i] === job) downloads[i] = undefined; // let a later attempt try again
+  });
+  return job;
+}
+
+/* Hands one downloaded pack to the engine, which unpacks it (LZMA) into its
+ * own memory and from then on answers reads out of it. */
+function installPack(i, packed) {
+  if (packReady(i)) return;
+  const pack = manifest.packs[i];
+  const src = M._malloc(packed.length);
+  M.HEAPU8.set(packed, src);
+  const dst = M._web_wad_alloc(i, pack.size);
+  const failed = !dst || M._web_lzma_decode(src, packed.length, dst, pack.size) !== 0;
+  M._free(src);
+  if (failed) throw new Error(`Part of the game data (${pack.name}) is damaged.`);
+  M._web_wad_ready(i);
+  showDownload();
+}
+
+async function ensurePack(i) {
+  if (packReady(i)) return;
+  const packed = await downloadPack(i);
+  await engineReady;
+  installPack(i, packed);
+}
+
+function showDownload() {
+  if (!manifest || !M) return;
+  let have = 0;
+  let total = 0;
+  manifest.packs.forEach((pack, i) => {
+    total += pack.bytes;
+    if (packReady(i)) have += pack.bytes;
+  });
+  const chip = $('#dl');
+  chip.classList.toggle('is-hidden', have >= total);
+  chip.textContent = `⬇ ${Math.floor((have / total) * 100)}%`;
+  chip.title = `Downloading the rest of the game: ${mb(have)} of ${mb(total)} MB`;
+}
+
+/* Everything not yet here, in the order it is likely to be wanted. */
+async function downloadTheRest() {
+  const order = [...manifest.levels['1'], 1];
+  for (let i = 0; i < manifest.packs.length; i++) if (!order.includes(i)) order.push(i);
+  let next = 0;
+  const worker = async () => {
+    while (next < order.length) {
+      const i = order[next++];
+      try {
+        await ensurePack(i);
+      } catch {
+        return; // offline, most likely; webEnsureLevel retries what it needs
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
+}
+
+/* The engine is about to load a level and wants its data. `wake` lets it go on. */
+async function ensureLevel(map, wake) {
+  const need = () => (manifest.levels[String(map)] || []).filter((i) => !packReady(i));
+  let waiting = false;
+  while (need().length) {
+    if (!waiting) {
+      waiting = true;
+      toast(`Loading level ${map}…`, true);
+    }
+    try {
+      await Promise.all(need().map(ensurePack));
+    } catch {
+      toast(`Level ${map} is still downloading. No connection? Trying again…`, true);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   }
-  setProgress(0.93, 'Unpacking…');
-  const unpacked = new Blob(parts).stream().pipeThrough(new DecompressionStream('gzip'));
-  return new Uint8Array(await new Response(unpacked).arrayBuffer());
+  if (waiting) toast('', false);
+  wake();
+}
+
+/* The safety net. The packer works out which wall art each level needs, but
+ * if the engine ever reads something that has not arrived (see web_wad.c),
+ * it cannot wait politely in the middle of drawing a frame. So the pack is
+ * fetched right now, blocking, the old-fashioned way. A stutter, not a crash. */
+function packSync(i) {
+  if (packReady(i)) return;
+  const pack = manifest.packs[i];
+  console.warn(`[freedoom] pack "${pack.name}" was needed before it had arrived; fetching it now`);
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `data/${pack.file}`, false);
+    xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    xhr.send();
+    if (xhr.status !== 200) return;
+    const text = xhr.responseText;
+    const bytes = new Uint8Array(text.length);
+    for (let k = 0; k < text.length; k++) bytes[k] = text.charCodeAt(k) & 0xff;
+    installPack(i, bytes);
+  } catch {}
 }
 
 const errLines = [];
@@ -763,6 +883,8 @@ function loadEngine() {
       webSfxParams: (channel, vol, sep) => channels[channel] && applyParams(channels[channel], vol, sep),
       webSfxPlaying: (channel) => !!channels[channel],
       webEvent: onEngineEvent,
+      webEnsureLevel: ensureLevel,
+      webPackSync: packSync,
     };
     const script = document.createElement('script');
     script.src = 'engine/freedoom.js';
@@ -801,11 +923,36 @@ async function start() {
   $('#progress').classList.remove('is-hidden');
   unlockAudio();
   try {
-    const [wad, mod] = await Promise.all([fetchGameData(), loadEngine()]);
-    M = mod;
-    setProgress(0.97, 'Starting…');
-    M.FS.writeFile('/freedoom2.wad', wad);
+    let release;
+    engineReady = new Promise((resolve) => {
+      release = resolve;
+    });
+    const engine = loadEngine();
+    const res = await fetch('packs.json');
+    if (!res.ok) throw new Error(`The game's file list did not download (${res.status}).`);
+    manifest = await res.json();
+    const core = downloadPack(0, (got, total) =>
+      setProgress((got / total) * 0.92, `Downloading… ${mb(got)} of ${mb(total)} MB`),
+    );
+    /* level 1 and the sounds start downloading now, not after the core lands */
+    for (const i of [...manifest.levels['1'], 1]) downloadPack(i).catch(() => {});
+
+    M = await engine;
+    /* Tell the engine where every piece of the game file will be found. */
+    const table = M._malloc(manifest.ranges.length * 4);
+    M.HEAPU32.set(manifest.ranges, table >> 2);
+    M._web_wad_init(manifest.wad.size, manifest.packs.length, manifest.ranges.length / 4, table);
+    M._free(table);
+    release();
+
+    const coreBytes = await core;
+    setProgress(0.96, 'Starting…');
+    installPack(0, coreBytes);
+    /* The engine checks that its data file exists before opening it. This is
+     * the file it finds; web_wad.c answers the reads. */
+    M.FS.writeFile('/freedoom2.wad', new Uint8Array(12));
     seedConfig(audio ? audio.sampleRate : 44100);
+    downloadTheRest();
 
     $('#screen-menu').classList.add('is-hidden');
     $('#topbar').classList.remove('is-hidden');
@@ -895,5 +1042,9 @@ window.__freedoom = {
   get module() {
     return M;
   },
+  get manifest() {
+    return manifest;
+  },
+  packReady,
   key: (down, key) => M._web_key(down, key, 0),
 };

@@ -271,9 +271,9 @@ export const GAMES = [
     blurb: 'The free, open-source first-person shooter. Thirty-two levels of corridors, keys and things that want you dead.',
     about: [
       'Freedoom: Phase 2 is a complete first-person shooter made by volunteers and given away: its own thirty-two levels, its own monsters, weapons, art and music, all under a free licence. This is that game, unmodified, running in a browser tab. Find the keys, open the doors, mind your ammunition, and look for the walls that are not quite walls.',
-      'It runs on Crispy Doom, an open-source engine, compiled to WebAssembly for this page. The first play downloads about 12 MB; after that it works offline. The game keeps its own saves and settings on this device, in the menu under Save Game and Options. The arcade adds one thing the game does not have, a score: points for each level finished, more for kills, secrets and speed, and more again on the harder skill levels. A run ends when you die.',
+      'It runs on Crispy Doom, an open-source engine, compiled to WebAssembly for this page. It starts after about 2 MB; the rest of the game, 8 MB in all, downloads behind it while you play, and after that it works offline. The game keeps its own saves and settings on this device, in the menu under Save Game and Options. The arcade adds one thing the game does not have, a score: points for each level finished, more for kills, secrets and speed, and more again on the harder skill levels. A run ends when you die.',
     ],
-    stats: { rating: '—', size: '12 MB', runTime: '5–15 min a level', players: '1' },
+    stats: { rating: '—', size: '8 MB', runTime: '5–15 min a level', players: '1' },
     meta: { developer: 'Freedoom project', released: '2024 · v0.13', releasedISO: '2024', genreLine: 'Shooter · First-person' },
     capabilities: ['Mouse', 'Keyboard', 'Touch', 'Gamepad', 'Offline', 'Saves', 'Open source'],
     controls: [

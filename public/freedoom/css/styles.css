@@ -103,6 +103,13 @@ body {
   cursor: pointer;
 }
 
+.chip-note {
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+  font-variant-numeric: tabular-nums;
+}
+
 .hint,
 .toast {
   position: absolute;

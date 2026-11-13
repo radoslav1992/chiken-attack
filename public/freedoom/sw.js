@@ -1,8 +1,8 @@
-const VERSION = 'freedoom-v1-20261113';
-/* The page shell is fetched up front. The engine and the 11 MB of game data
- * are not: they are cached the first time the player actually starts the
- * game (see the fetch handler), so a visit that never presses Play costs
- * nothing. */
+const VERSION = 'freedoom-v2-20261113';
+/* The page shell is fetched up front. The engine and the game data are not:
+ * each pack is cached as the page downloads it (see the fetch handler), so a
+ * visit that never presses Play costs nothing, and once the last pack has
+ * arrived the whole game works offline. */
 const ASSETS = [
   './',
   'css/styles.css',
@@ -10,6 +10,7 @@ const ASSETS = [
   'js/score.js',
   'icon.svg',
   'manifest.webmanifest',
+  'packs.json',
   '/shared/arcade.js',
   '/shared/arcade.css',
   '/fonts/press-start-2p.woff2',

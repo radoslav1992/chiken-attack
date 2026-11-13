@@ -19,11 +19,19 @@
 #ifndef WEB_EVENTS_H
 #define WEB_EVENTS_H
 
+#include <stdint.h>
+
+#include "doomtype.h"
+
 void Web_NewGame(int skill, int map);
 void Web_GameLoaded(int skill, int map);
 void Web_LevelDone(int map, int kills, int total_kills, int items,
                    int total_items, int secrets, int total_secrets,
                    int seconds, int skill);
 void Web_PlayerDied(int map, int kills, int skill);
+
+// web_wad.c: the game data arrives in packs; see that file.
+void Web_EnsureLevel(int map);
+boolean Web_DataReady(uint32_t position);
 
 #endif

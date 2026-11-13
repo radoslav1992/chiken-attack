@@ -37,7 +37,7 @@ Seven cabinets are open:
 
 All seven are playable offline. The first six are the arcade's own, and every pixel and sound in
 them is generated procedurally at runtime (Canvas2D + Web Audio) — the repo ships no image or
-audio assets for their gameplay. Freedoom is the exception: it brings its own 11 MB data file.
+audio assets for their gameplay. Freedoom is the exception: it brings its own 8 MB of data.
 
 ## Stack
 
@@ -591,8 +591,8 @@ to spell out.
 shooter made by volunteers over twenty years: thirty-two levels, with its own monsters, weapons,
 art, sound and music, under a BSD licence. It runs on the engine id Software released as open
 source, here in the form of [Crispy Doom](https://github.com/fabiangreffrath/crispy-doom) 6.0.
-`public/freedoom/` is that engine compiled to WebAssembly, the Freedoom data file unmodified, and
-a page around them.
+`public/freedoom/` is that engine compiled to WebAssembly, the Freedoom data file (cut into
+pieces for download, but byte-for-byte the same once reassembled), and a page around them.
 
 **What it is not.** It is not id Software's game and contains none of it: no levels, art, sound
 or music from the commercial games are in this repository, and the page does not present
@@ -613,8 +613,12 @@ something else.
 
 **How it differs from the other cabinets.**
 
-- It is 12 MB, not 0.1. The service worker fetches only the page up front; the engine and data
-  are cached the first time someone presses Play.
+- It is 8 MB, not 0.1, but only 2 of that stands between pressing Play and the title screen.
+  The game data is cut into 35 packs: one core, one per level, the sound effects, and the
+  leftovers. The page fetches the core, starts, and pulls in the rest while the player is busy;
+  a level asked for early simply waits for its own pack. `tools/freedoom/README.md` has the
+  details and `tools/freedoom/make-packs.py` does the cutting. The service worker caches each
+  pack as it arrives, so once the last one is in the whole game works offline.
 - It needs `'wasm-unsafe-eval'` in the site's Content-Security-Policy, which is why `_headers`
   now has it. That permits compiling a `.wasm` file and nothing else: no `eval`, no inline
   script. The engine is built with `DYNAMIC_EXECUTION=0` so it asks for no more than that, and
