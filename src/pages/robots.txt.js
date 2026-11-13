@@ -38,16 +38,18 @@ export function GET(context) {
     '# Beaver Games — free browser games, no installs, no ads.',
     '# All crawlers are welcome, AI assistants and AI search included.',
     '',
+    '# The /api/ routes are JSON for the games, not pages worth indexing.',
+    '',
+    // One group per agent. A crawler obeys only the most specific group that
+    // names it, and some read just the first group for "*", so the rule has to
+    // be repeated rather than stated once and assumed.
     'User-agent: *',
     'Allow: /',
-    '',
-    '# The /api/ routes are JSON for the games, not pages worth indexing.',
-    'User-agent: *',
     'Disallow: /api/',
     '',
   ];
   for (const bot of AI_BOTS) {
-    lines.push(`User-agent: ${bot}`, 'Allow: /', '');
+    lines.push(`User-agent: ${bot}`, 'Allow: /', 'Disallow: /api/', '');
   }
   lines.push(`Sitemap: ${new URL('/sitemap.xml', context.site).href}`, '');
   lines.push(`# AI manifest: ${new URL('/llms.txt', context.site).href}`, '');

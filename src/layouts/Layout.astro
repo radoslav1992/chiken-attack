@@ -13,6 +13,8 @@ interface Props {
   schema?: object[];
   /** Set on pages that should stay out of search indexes (404). */
   noindex?: boolean;
+  /** Open Graph type; game pages are still "website" to every consumer that cares. */
+  ogType?: string;
 }
 
 const {
@@ -22,6 +24,7 @@ const {
   imageAlt = SITE.ogImageAlt,
   schema = [],
   noindex = false,
+  ogType = 'website',
 } = Astro.props;
 
 // Absolute canonical URL. The Worker serves directories with a trailing slash
@@ -29,6 +32,9 @@ const {
 const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
 const canonical = new URL(path, Astro.site).href;
 const imageUrl = new URL(image, Astro.site).href;
+// Everything under /media/og/ is a 1200x630 JPEG (tools/make-og-images.mjs).
+// Saying so lets a preview lay itself out before it has fetched the picture.
+const isCard = image.startsWith('/media/og/');
 
 // Every page carries the site-wide WebSite + Organization nodes; pages append
 // their own (VideoGame, FAQPage, BreadcrumbList, …) via the schema prop.
@@ -49,7 +55,8 @@ const graph = {
       '@id': new URL('/#organization', Astro.site).href,
       name: SITE.author,
       url: new URL('/', Astro.site).href,
-      logo: new URL(SITE.ogImage, Astro.site).href,
+      logo: new URL(SITE.logo, Astro.site).href,
+      sameAs: SITE.sameAs,
     },
     ...schema,
   ],
@@ -66,16 +73,25 @@ const graph = {
     <meta name="author" content={SITE.author} />
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large'} />
     <meta name="generator" content={Astro.generator} />
-    <link rel="canonical" href={canonical} />
+    {/* A page asking not to be indexed should not also name itself canonical. */}
+    {!noindex && <link rel="canonical" href={canonical} />}
     <meta name="theme-color" content="#141715" />
     <link rel="icon" href="/chicken-attack/icons/icon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/chicken-attack/icons/apple-touch-icon.png" />
+    {/* The two faces every page paints first. Fetched alongside the CSS rather
+        than after it, so the headline does not redraw when they arrive. */}
+    <link rel="preload" href="/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/bungee.woff2" as="font" type="font/woff2" crossorigin />
 
     <meta property="og:site_name" content={SITE.name} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={imageUrl} />
+    {isCard && <meta property="og:image:type" content="image/jpeg" />}
+    {isCard && <meta property="og:image:width" content="1200" />}
+    {isCard && <meta property="og:image:height" content="630" />}
     <meta property="og:image:alt" content={imageAlt} />
     <meta property="og:locale" content="en_US" />
 

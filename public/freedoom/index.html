@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Freedoom: Phase 2 — a free first-person shooter in your browser</title>
+    <meta
+      name="description"
+      content="Freedoom: Phase 2, the free and open-source first-person shooter, running in the browser. Thirty-two levels, mouse and keyboard or touch, saves on your device."
+    />
+    <meta name="theme-color" content="#120d0c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Freedoom" />
+    <link rel="canonical" href="/games/freedoom/" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="/shared/arcade.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <canvas id="screen" role="img" aria-label="Game screen" width="640" height="400"></canvas>
+        <div id="topbar" class="topbar is-hidden">
+          <span id="dl" class="chip-btn chip-note is-hidden" role="status"></span>
+          <button id="btn-menu" class="chip-btn" type="button" aria-label="Game menu">☰ Menu</button>
+          <button id="btn-sound" class="chip-btn" type="button">♪ Sound on</button>
+        </div>
+        <p id="hint" class="hint is-hidden">Click the game to aim with the mouse · Esc for the menu</p>
+        <p id="toast" class="toast" aria-live="polite"></p>
+      </div>
+
+      <div id="pad" class="pad is-hidden">
+        <div id="pad-play" class="pad-set">
+          <div id="stick" class="stick" role="group" aria-label="Move"><span id="stick-knob" class="stick-knob"></span></div>
+          <div id="look" class="look" role="group" aria-label="Turn: drag left or right">
+            <span>drag to turn</span>
+          </div>
+          <div class="pad-buttons">
+            <button class="pad-btn" data-tap="prev" type="button" aria-label="Previous weapon">◀</button>
+            <button class="pad-btn" data-tap="next" type="button" aria-label="Next weapon">▶</button>
+            <button class="pad-btn" data-key="use" type="button" aria-label="Use or open">USE</button>
+            <button class="pad-btn pad-fire" data-key="fire" type="button" aria-label="Fire">FIRE</button>
+          </div>
+        </div>
+        <div id="pad-menu" class="pad-set is-hidden">
+          <div class="dpad">
+            <button class="pad-btn" data-key="up" type="button" aria-label="Up">▲</button>
+            <button class="pad-btn" data-key="left" type="button" aria-label="Left">◀</button>
+            <button class="pad-btn" data-key="right" type="button" aria-label="Right">▶</button>
+            <button class="pad-btn" data-key="down" type="button" aria-label="Down">▼</button>
+          </div>
+          <div class="pad-buttons">
+            <button class="pad-btn" data-key="escape" type="button" aria-label="Back">BACK</button>
+            <button class="pad-btn" data-key="yes" type="button" aria-label="Yes">Y</button>
+            <button class="pad-btn pad-fire" data-key="enter" type="button" aria-label="Select">OK</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Launcher -->
+      <section id="screen-menu" class="panel-wrap" aria-label="Start">
+        <div class="panel">
+          <p class="kicker">FREE AND OPEN SOURCE · 32 LEVELS</p>
+          <h1 class="title">FREEDOOM</h1>
+          <p class="subtitle">Phase 2</p>
+          <p class="copy">
+            A complete first-person shooter made by the Freedoom project and given away freely:
+            its own levels, monsters, art and music, on a classic open-source engine.
+          </p>
+          <button id="btn-play" class="btn-big" type="button">▶ PLAY</button>
+          <div id="progress" class="progress is-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <i id="progress-fill"></i>
+          </div>
+          <p id="load-note" class="best">Starts after about 2 MB. The rest of the game, 8 MB in all, downloads while you play. Saves stay on this device.</p>
+          <div class="menu-row">
+            <button id="btn-sound-menu" class="btn-small" type="button">♪ Sound on</button>
+            <a class="btn-small btn-link" href="/">← Arcade</a>
+          </div>
+          <details class="how">
+            <summary>Controls</summary>
+            <p>
+              <b>Mouse and keyboard</b> — click the game to capture the mouse · W A S D to move ·
+              mouse to turn · left click or F to fire · E or Space to open doors · 1–7 or the
+              wheel to change weapon · Tab for the map · Esc for the menu.
+            </p>
+            <p>
+              <b>Keyboard only</b> — arrow keys move and turn, F fires, Shift walks.
+            </p>
+            <p>
+              <b>Touch</b> — left stick to move, drag the right side to turn, FIRE and USE under
+              your thumb. A gamepad works too.
+            </p>
+          </details>
+          <details class="how">
+            <summary>Credits and licences</summary>
+            <p>
+              <b>Freedoom: Phase 2</b> (version 0.13.0) is © 2001–2024 the contributors to the
+              Freedoom project, under a BSD 3-clause licence:
+              <a href="licenses/COPYING-FREEDOOM.txt">licence</a> ·
+              <a href="licenses/CREDITS-FREEDOOM.txt">credits</a>.
+            </p>
+            <p>
+              The engine is <b>Crispy Doom 6.0</b>, © id Software, Simon Howard, Fabian Greffrath
+              and contributors, under the GNU General Public License version 2:
+              <a href="licenses/COPYING-GPL2.txt">licence</a> ·
+              <a href="licenses/SOURCE.txt">source code and how to rebuild it</a>.
+            </p>
+            <p>This is an unofficial browser build. It is not affiliated with id Software.</p>
+          </details>
+          <p id="menu-message" class="best" role="status"></p>
+        </div>
+      </section>
+
+      <!-- Run summary -->
+      <section id="screen-over" class="sheet-wrap is-hidden" aria-label="Run summary">
+        <div class="sheet">
+          <h2 id="over-title" class="title-sm">RUN OVER</h2>
+          <p id="over-note" class="copy copy-dim"></p>
+          <div class="result-grid">
+            <div><span>Score</span><b id="over-score">0</b></div>
+            <div><span>Levels cleared</span><b id="over-levels">0</b></div>
+          </div>
+          <form id="name-form" class="name-form" autocomplete="off">
+            <label class="name-label" for="name-input">Name on the board</label>
+            <div class="name-row">
+              <input id="name-input" class="name-input" type="text" maxlength="12" spellcheck="false" autocapitalize="characters" />
+              <button id="btn-save-name" class="btn-small" type="submit">Save</button>
+            </div>
+          </form>
+          <button id="btn-over-close" class="btn-big" type="button">BACK TO THE GAME</button>
+        </div>
+      </section>
+
+      <!-- Engine has exited or failed -->
+      <section id="screen-end" class="panel-wrap is-hidden" aria-label="Game closed">
+        <div class="panel">
+          <h2 id="end-title" class="title-sm">GAME CLOSED</h2>
+          <p id="end-note" class="copy copy-dim"></p>
+          <button id="btn-reload" class="btn-big" type="button">▶ START AGAIN</button>
+          <a class="btn-small btn-link btn-center" href="/">← Arcade</a>
+        </div>
+      </section>
+    </div>
+
+    <noscript><p class="noscript-note">Freedoom needs JavaScript and WebAssembly to run.</p></noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

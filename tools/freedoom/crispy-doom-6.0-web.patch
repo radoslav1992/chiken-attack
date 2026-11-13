@@ -1,0 +1,281 @@
+diff -ruN a/src/doom/g_game.c b/src/doom/g_game.c
+--- a/src/doom/g_game.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/g_game.c	2026-11-13 08:41:17.815338118 +0000
+@@ -75,6 +75,10 @@
+ 
+ 
+ #include "g_game.h"
++
++#ifdef __EMSCRIPTEN__
++#include "web_events.h" // [web] tell the page about new games, deaths and finished levels
++#endif
+ #include "v_trans.h" // [crispy] colored "always run" message
+ 
+ #include "deh_main.h" // [crispy] for demo footer
+@@ -2071,6 +2075,13 @@
+     // will agree with Compet-n.
+     wminfo.totaltimes = (totalleveltimes += (leveltime - leveltime % TICRATE));
+ 
++#ifdef __EMSCRIPTEN__
++    Web_LevelDone(gamemap, players[consoleplayer].killcount, totalkills,
++                  players[consoleplayer].itemcount, totalitems,
++                  players[consoleplayer].secretcount, totalsecret,
++                  leveltime / TICRATE, gameskill);
++#endif
++
+     gamestate = GS_INTERMISSION; 
+     viewactive = false; 
+     automapactive = false; 
+@@ -2249,6 +2260,10 @@
+ 
+     fclose(save_stream);
+     
++#ifdef __EMSCRIPTEN__
++    Web_GameLoaded(gameskill, gamemap);
++#endif
++
+     if (setsizeneeded)
+ 	R_ExecuteSetViewSize ();
+     
+@@ -2446,6 +2461,10 @@
+     // [crispy] make sure "fast" parameters are really only applied once
+     static boolean fast_applied;
+ 
++#ifdef __EMSCRIPTEN__
++    Web_NewGame(skill, map);
++#endif
++
+     if (paused)
+     {
+ 	paused = false;
+@@ -2906,6 +2925,14 @@
+  
+ void G_DeferedPlayDemo(const char *name)
+ { 
++#ifdef __EMSCRIPTEN__
++    // [web] The title screen's demos each need a whole level loaded, and the
++    // levels arrive on demand. Fetching three of them so that nobody can
++    // watch the menu's background is a poor trade; the title and credit
++    // pages simply cycle instead.
++    return;
++#endif
++
+     defdemoname = name; 
+     gameaction = ga_playdemo; 
+ 
+diff -ruN a/src/doom/p_inter.c b/src/doom/p_inter.c
+--- a/src/doom/p_inter.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/p_inter.c	2026-11-13 07:52:12.838684094 +0000
+@@ -39,6 +39,10 @@
+ 
+ #include "p_inter.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include "web_events.h" // [web] tell the page about new games, deaths and finished levels
++#endif
++
+ 
+ #define BONUSADD	6
+ 
+@@ -764,6 +768,12 @@
+ 			
+ 	target->flags &= ~MF_SOLID;
+ 	target->player->playerstate = PST_DEAD;
++#ifdef __EMSCRIPTEN__
++	if (target->player == &players[consoleplayer])
++	{
++	    Web_PlayerDied(gamemap, target->player->killcount, gameskill);
++	}
++#endif
+ 	P_DropWeapon (target->player);
+ 	// [crispy] center view when dying
+ 	target->player->centering = true;
+diff -ruN a/src/doom/p_setup.c b/src/doom/p_setup.c
+--- a/src/doom/p_setup.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/p_setup.c	2026-11-13 08:41:17.805821789 +0000
+@@ -1118,6 +1118,15 @@
+     boolean	crispy_validblockmap;
+     mapformat_t	crispy_mapformat;
+ 	
++#ifdef __EMSCRIPTEN__
++    // [web] this level's data may still be on its way: wait for it here,
++    // before anything below tries to read it
++    {
++        extern void Web_EnsureLevel(int map);
++        Web_EnsureLevel(map);
++    }
++#endif
++
+     totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
+     // [crispy] count spawned monsters
+     extrakills = 0;
+diff -ruN a/src/doom/r_data.c b/src/doom/r_data.c
+--- a/src/doom/r_data.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/doom/r_data.c	2026-11-13 08:41:17.816209033 +0000
+@@ -155,6 +155,19 @@
+ unsigned**		texturecolumnofs; // [crispy] column offsets for composited translucent mid-textures on 2S walls
+ unsigned**		texturecolumnofs2; // [crispy] column offsets for composited opaque textures
+ byte**			texturecomposite; // [crispy] composited translucent mid-textures on 2S walls
++
++#ifdef __EMSCRIPTEN__
++// [web] R_GenerateLookup() reads every patch a texture is made of. Done for
++// all textures at startup, that is the whole 10 MB of wall art before the
++// title screen. Done the first time each texture is asked for, it is only
++// the art a level really uses.
++void R_GenerateLookup (int texnum);
++static byte *texturelookupdone;
++#define R_EnsureLookup(tex) \
++    do { if (!texturelookupdone[tex]) { texturelookupdone[tex] = 1; R_GenerateLookup(tex); } } while (0)
++#else
++#define R_EnsureLookup(tex)
++#endif
+ byte**			texturecomposite2; // [crispy] composited opaque textures
+ const byte**	texturebrightmap; // [crispy] brightmaps
+ 
+@@ -602,6 +615,7 @@
+     int		ofs;
+ 	
+     col &= texturewidthmask[tex];
++    R_EnsureLookup(tex);
+     ofs = texturecolumnofs2[tex][col];
+ 
+     if (!texturecomposite2[tex])
+@@ -622,6 +636,7 @@
+ 	col += texturewidth[tex];
+ 
+     col %= texturewidth[tex];
++    R_EnsureLookup(tex);
+     ofs = texturecolumnofs[tex][col];
+ 
+     if (!texturecomposite[tex])
+@@ -984,8 +999,12 @@
+     
+     // Precalculate whatever possible.	
+ 
++#ifdef __EMSCRIPTEN__
++    texturelookupdone = calloc(numtextures, 1); // [web] built on first use
++#else
+     for (i=0 ; i<numtextures ; i++)
+ 	R_GenerateLookup (i);
++#endif
+     
+     // Create translation table for global animation.
+     texturetranslation = Z_Malloc ((numtextures+1)*sizeof(*texturetranslation), PU_STATIC, 0);
+@@ -1420,6 +1439,7 @@
+ 	    continue;
+ 
+ 	// [crispy] precache composite textures
++	R_EnsureLookup(i);
+ 	R_GenerateComposite(i);
+ 
+ 	texture = textures[i];
+diff -ruN a/src/i_sound.c b/src/i_sound.c
+--- a/src/i_sound.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/i_sound.c	2026-11-13 07:44:51.974012792 +0000
+@@ -78,12 +78,21 @@
+ 
+ // Compiled-in sound modules:
+ 
++#ifdef __EMSCRIPTEN__
++// [web] Sound effects are played by the page; see web/web_sound.c.
++extern const sound_module_t sound_web_module;
++#endif
++
+ static const sound_module_t *sound_modules[] =
+ {
++#ifdef __EMSCRIPTEN__
++    &sound_web_module,
++#else
+ #ifndef DISABLE_SDL2MIXER
+     &sound_sdl_module,
+ #endif // DISABLE_SDL2MIXER
+     &sound_pcsound_module,
++#endif
+     NULL,
+ };
+ 
+diff -ruN a/src/w_file.c b/src/w_file.c
+--- a/src/w_file.c	2023-03-31 20:42:24.000000000 +0000
++++ b/src/w_file.c	2026-11-13 08:41:17.803781161 +0000
+@@ -37,11 +37,25 @@
+     &stdc_wad_file,
+ };
+ 
++#ifdef __EMSCRIPTEN__
++// [web] The game data is not a file on disk; see web/web_wad.c.
++extern wad_file_class_t web_wad_file;
++#endif
++
+ wad_file_t *W_OpenFile(const char *path)
+ {
+     wad_file_t *result;
+     int i;
+ 
++#ifdef __EMSCRIPTEN__
++    result = web_wad_file.OpenFile(path);
++
++    if (result != NULL)
++    {
++        return result;
++    }
++#endif
++
+     //!
+     // @category obscure
+     //
+diff -ruN a/opl/opl.c b/opl/opl.c
+--- a/opl/opl.c	2023-03-31 20:42:24.000000000 +0000
++++ b/opl/opl.c	2026-11-13 07:45:22.711646836 +0000
+@@ -29,6 +29,11 @@
+ //#define OPL_DEBUG_TRACE
+ 
+ 
++#ifdef __EMSCRIPTEN__
++extern opl_driver_t opl_web_driver;
++extern void OPL_Web_Advance(uint64_t us);
++#endif
++
+ static opl_driver_t *drivers[] =
+ {
+ #if (defined(__i386__) || defined(__x86_64__)) && defined(HAVE_IOPERM)
+@@ -43,6 +48,9 @@
+ #ifndef DISABLE_SDL2MIXER
+     &opl_sdl_driver,
+ #endif // DISABLE_SDL2MIXER
++#ifdef __EMSCRIPTEN__
++    &opl_web_driver, // [web] see web/opl_web.c
++#endif
+     NULL
+ };
+ 
+@@ -443,6 +451,21 @@
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++
++// [web] There is no second thread to wait on. The emulated chip's clock only
++// moves when sound is produced, so "waiting" means moving that clock.
++
++void OPL_Delay(uint64_t us)
++{
++    if (driver != NULL)
++    {
++        OPL_Web_Advance(us);
++    }
++}
++
++#else
++
+ typedef struct
+ {
+     int finished;
+@@ -498,6 +521,8 @@
+     SDL_DestroyCond(delay_data.cond);
+ }
+ 
++#endif // __EMSCRIPTEN__
++
+ void OPL_SetPaused(int paused)
+ {
+     if (driver != NULL)

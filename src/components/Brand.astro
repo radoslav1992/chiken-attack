@@ -20,7 +20,7 @@
  * Sizes are classes in global.css. The width/height attributes stay because they
  * are HTML, not CSS, and they let the browser reserve the aspect ratio.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface Props {
@@ -29,8 +29,9 @@ interface Props {
 
 const { variant = 'header' } = Astro.props;
 
-const MARKS = ['beaver-games-mark.png', 'beaver-games-mark.webp', 'beaver-games-mark.svg'];
-const FULL = ['beaver-games-logo.png', 'beaver-games-logo.webp', 'beaver-games-logo.svg', 'logo.png', 'logo.svg'];
+// WebP first: the PNG logo is the 1.4 MB master, not something to ship in a footer.
+const MARKS = ['beaver-games-mark.webp', 'beaver-games-mark.png', 'beaver-games-mark.svg'];
+const FULL = ['beaver-games-logo.webp', 'beaver-games-logo.png', 'beaver-games-logo.svg', 'logo.png', 'logo.svg'];
 
 const mediaDir = join(process.cwd(), 'public', 'media');
 const find = (names) => names.find((f) => existsSync(join(mediaDir, f)));
@@ -38,6 +39,25 @@ const find = (names) => names.find((f) => existsSync(join(mediaDir, f)));
 // The header prefers the badge; the footer prefers the whole thing.
 const chosen = variant === 'header' ? find(MARKS) || find(FULL) : find(FULL) || find(MARKS);
 const src = chosen ? `/media/${chosen}` : null;
+
+/* The picture's own size, read from its header, so the browser can reserve the
+   space before the file arrives and nothing beside the logo jumps. */
+function sizeOf(file) {
+  try {
+    const b = readFileSync(file);
+    if (b.toString('latin1', 1, 4) === 'PNG') return [b.readUInt32BE(16), b.readUInt32BE(20)];
+    if (b.toString('latin1', 8, 12) !== 'WEBP') return null;
+    const kind = b.toString('latin1', 12, 16);
+    if (kind === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+    if (kind === 'VP8L') {
+      const n = b.readUInt32LE(21);
+      return [1 + (n & 0x3fff), 1 + ((n >> 14) & 0x3fff)];
+    }
+    if (kind === 'VP8 ') return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+  } catch {}
+  return null;
+}
+const size = chosen ? sizeOf(join(mediaDir, chosen)) : null;
 // Show type beside the image only when the image is the wordmark-free badge.
 const withType = variant === 'header' && !!chosen && MARKS.includes(chosen);
 ---
@@ -45,7 +65,15 @@ const withType = variant === 'header' && !!chosen && MARKS.includes(chosen);
 {
   src ? (
     <>
-      <img src={src} alt="Beaver Games" class={`brand-logo brand-logo-${variant}`} decoding="async" />
+      <img
+        src={src}
+        alt="Beaver Games"
+        class={`brand-logo brand-logo-${variant}`}
+        width={size?.[0]}
+        height={size?.[1]}
+        decoding="async"
+        loading={variant === 'footer' ? 'lazy' : undefined}
+      />
       {withType && <span class="brand-name">BEAVER GAMES</span>}
     </>
   ) : (

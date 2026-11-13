@@ -115,6 +115,7 @@ test("every offline game includes all shared dependencies", () => {
     "whittle-wares",
     "dam-defender",
     "timber-tails",
+    "freedoom",
   ]) {
     const sw = readFileSync(`public/${slug}/sw.js`, "utf8");
     assert.match(sw, /'\/shared\/arcade.js'/);

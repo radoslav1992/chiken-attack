@@ -5,7 +5,7 @@ small API Worker on Cloudflare. The landing page and per-game pages implement th
 design handoff; each game lives in `public/<slug>/` as a fully self-contained, installable PWA
 with its own service worker — the game page launches it in place, right inside the cabinet stage.
 
-Six cabinets are open:
+Seven cabinets are open:
 
 - **Chicken Attack** (`/chicken-attack/`, page at `/games/chicken-attack/`) — an arcade shooter in
   the spirit of *Chicken Invaders*: nine weapons, timed power-ups, alternating bosses, difficulty
@@ -31,8 +31,13 @@ Six cabinets are open:
   a beaver kit, eight worlds, thirty-two hand-drawn stages and a boar at the end of every fourth.
   Run, jump, land on things, tail-slam the things you cannot land on.
 
-All six are fully playable offline and every pixel and sound in them is generated procedurally at
-runtime (Canvas2D + Web Audio) — the repo ships no image or audio assets for gameplay.
+- **Freedoom** (`/freedoom/`, page at `/games/freedoom/`) — not ours. This is
+  [Freedoom: Phase 2](https://freedoom.github.io/), the free and open-source first-person shooter,
+  running unmodified on an open-source engine compiled to WebAssembly. Hosted here, credited there.
+
+All seven are playable offline. The first six are the arcade's own, and every pixel and sound in
+them is generated procedurally at runtime (Canvas2D + Web Audio) — the repo ships no image or
+audio assets for their gameplay. Freedoom is the exception: it brings its own 8 MB of data.
 
 ## Stack
 
@@ -88,6 +93,34 @@ sitemap), `/llms.txt` (the [llms.txt](https://llmstxt.org/) manifest for AI assi
 from `games.js` + `faq.js`), and `/sitemap.xml` (from the playable games list). They live in
 `src/pages/*.txt.js` / `*.xml.js`, not `public/`.
 
+What each page says about itself comes from `src/data/games.js` and `src/data/site.js`, and
+`tests/seo.test.mjs` holds it to the limits below so a new game cannot quietly ship without it:
+
+- **Titles and descriptions.** Each game has `seo.title` (name first, then what kind of game it
+  is and that it is free; 60 characters at most) and `seo.description` (120–160 characters, the
+  snippet under a search result). These are separate from `blurb`, which is written for the card
+  and is too short and too playful to be a search snippet.
+- **One address per page.** Every internal link to a game is the plain `/games/<slug>/` URL — the
+  one in the sitemap and the canonical tag. The lobby still skips the poster on click: links carry
+  `data-play`, and a small handler adds `?play=1` on the way out. Before this, sixteen links on the
+  home page pointed at the `?play=1` spelling, so the URL a crawler followed was never the
+  canonical one.
+- **The playable shells are not rivals to the game pages.** `/timber-tails/` and its siblings are
+  what the stage iframes load, and they are reachable on their own ("Open full page"). Each now
+  carries `<link rel="canonical" href="/games/<slug>/">`, so the page with the description,
+  controls and leaderboard is the one that gets indexed.
+- **Share images.** `ogImage` is a 1200×630 JPEG under 300 KB, made by
+  `tools/make-og-images.mjs` from the card art and the site fonts. Previously the home page shared
+  a square 1.4 MB logo, most games a 16:9 screenshot, and Dam Defender an SVG, which most link
+  previews will not draw at all.
+- **Weight.** Card and stage art is WebP, and the footer uses a 320 px WebP of the logo rather
+  than the 1024 px master. A first visit to the home page went from about 2.7 MB of images to
+  about 0.26 MB. Both body fonts are preloaded and the logo images carry their dimensions, so
+  nothing shifts as the page settles.
+- **Structured data.** Game pages are typed `["VideoGame", "WebApplication"]` with
+  `isAccessibleForFree`, a zero-price offer, a screenshot and the share image; the sitemap lists
+  each page's images; `robots.txt` has one group per agent, each of which keeps `/api/` out.
+
 Two knobs to know about:
 
 - **Canonical origin** — set in `astro.config.mjs` (`site`), overridable with a `SITE_URL` env
@@ -118,7 +151,12 @@ the board, and the games never depend on it (score submission is fire-and-forget
 2. Add an entry in `src/data/games.js` with `playable: true` — the landing catalog and
    `/games/<slug>/` page generate from it.
 3. Add the slug to `KNOWN_GAMES` in `worker/index.js` to open its leaderboard.
-4. Add `_headers` cache rules for the new paths, plus card/stage art in `public/media/`.
+4. Add `_headers` cache rules for the new paths, plus card/stage art in `public/media/` as WebP
+   (or SVG).
+5. Fill in the entry's `seo.title`, `seo.description`, `share` and `ogImage`, put
+   `<link rel="canonical" href="/games/<slug>/" />` in the game's own `index.html`, and run
+   `node tools/make-og-images.mjs` for its share image. `tests/seo.test.mjs` fails until all of
+   that is in place.
 
 ## Layout
 
@@ -139,8 +177,10 @@ public/
   whittle-wares/            game — shopkeeper RPG; economy.js and world.js are pure modules
   dam-defender/             game — tower defence; data.js and engine.js are pure modules
   timber-tails/             game — platformer; engine.js, build.js and levels.js are pure modules
+  freedoom/                 hosted game — WebAssembly engine, game data, licences, upstream source
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
-  media/                    cabinet/stage art (captured from real gameplay)
+  media/                    cabinet/stage art (captured from real gameplay), as WebP
+  media/og/                 1200x630 share images, one per page (tools/make-og-images.mjs)
   sw.js                     self-destruct stub migrating pre-Astro installs
   _headers                  security headers + cache policy
 wrangler.jsonc              Workers config: assets + Worker + D1
@@ -148,6 +188,8 @@ tools/make-icons.mjs        Chicken Attack icon set
 tools/make-beaver-icons.mjs Beaver Dash icon set
 tools/make-orbit-icons.mjs  Orbit Cadet icon set
 tools/make-whittle-icons.mjs Whittle & Wares icon set  (npm run icons runs all four)
+tools/make-og-images.mjs    share images for link previews (needs Playwright; see the file)
+tools/freedoom/             the engine port: patch, browser layer, build script (GPL)
 ```
 
 ## The brand mark
@@ -161,7 +203,10 @@ cp your-logo.png public/media/beaver-games-logo.png
 npm run build
 ```
 
-Every header and footer picks it up with no code change. `beaver-games-logo.{png,webp,svg}` and
+Every header and footer picks it up with no code change. One catch: the pages prefer
+`beaver-games-logo.webp` and `beaver-games-mark.webp` (small copies, so the footer does not ship
+the 1.4 MB master), so after replacing the PNG either re-encode those two or delete them — with
+no WebP present the PNG is used. `beaver-games-logo.{png,webp,svg}` and
 `logo.{png,svg}` are all accepted, first match wins. A build-time check rather than an `onerror`
 attribute because the site's CSP forbids inline handlers, and it means there is never a 404 for a
 logo that has not been added yet.
@@ -536,3 +581,53 @@ could reach him — which is why his speed climbs gently and the daze never drop
 - **Progress is two things.** Opened stages and found logs are permanent on the browser. A run —
   score, lives, acorns — is saved at the start of each stage and ends when the lives do; the score
   that goes on the board is the run's, with stages cleared in the `wave` column.
+
+## Freedoom (the hosted one)
+
+Everything else in the arcade was written here. This was not, and the difference matters enough
+to spell out.
+
+**What it is.** [Freedoom: Phase 2](https://freedoom.github.io/) is a complete first-person
+shooter made by volunteers over twenty years: thirty-two levels, with its own monsters, weapons,
+art, sound and music, under a BSD licence. It runs on the engine id Software released as open
+source, here in the form of [Crispy Doom](https://github.com/fabiangreffrath/crispy-doom) 6.0.
+`public/freedoom/` is that engine compiled to WebAssembly, the Freedoom data file (cut into
+pieces for download, but byte-for-byte the same once reassembled), and a page around them.
+
+**What it is not.** It is not id Software's game and contains none of it: no levels, art, sound
+or music from the commercial games are in this repository, and the page does not present
+Freedoom as anything but Freedoom. `tests/freedoom.test.mjs` checks the data file is the Freedoom
+release (by hash and by its marker lump) and that the catalog copy does not market it as
+something else.
+
+**Licences, and what they oblige.**
+
+- The engine is GPL-2.0. Anyone who receives the binary is entitled to the source, so the
+  upstream tarball is served from `public/freedoom/source/`, the changes live in
+  `tools/freedoom/`, and `public/freedoom/licenses/SOURCE.txt` says how the two fit together.
+  The browser layer in `tools/freedoom/web/` is GPL too, as a derived work.
+- Freedoom is BSD-3-Clause: redistribute freely, keep the notice. The licence and the full
+  credits are in `public/freedoom/licenses/` and linked from the start screen.
+- The rest of this repository is unaffected. The engine is a separate program that the page
+  loads; nothing of the arcade's is linked into it.
+
+**How it differs from the other cabinets.**
+
+- It is 8 MB, not 0.1, but only 2 of that stands between pressing Play and the title screen.
+  The game data is cut into 35 packs: one core, one per level, the sound effects, and the
+  leftovers. The page fetches the core, starts, and pulls in the rest while the player is busy;
+  a level asked for early simply waits for its own pack. `tools/freedoom/README.md` has the
+  details and `tools/freedoom/make-packs.py` does the cutting. The service worker caches each
+  pack as it arrives, so once the last one is in the whole game works offline.
+- It needs `'wasm-unsafe-eval'` in the site's Content-Security-Policy, which is why `_headers`
+  now has it. That permits compiling a `.wasm` file and nothing else: no `eval`, no inline
+  script. The engine is built with `DYNAMIC_EXECUTION=0` so it asks for no more than that, and
+  the test suite checks both halves.
+- The game keeps its own saves and settings (in IndexedDB, through the engine's file system),
+  not through the arcade's code.
+- It has no score of its own. The engine reports when a level ends and when the player dies
+  (`web_events.c`), and `public/freedoom/js/score.js` turns that into the number that goes on the
+  board: kills, secrets, pace, and the skill level as a multiplier.
+- Fire is on F and the mouse, not Ctrl. Ctrl+W closes a browser tab and no page can prevent it.
+
+`tools/freedoom/README.md` covers the port itself and how to rebuild it.

@@ -2,6 +2,13 @@
  * The single source of truth for every cabinet in the arcade. The landing
  * page, the game pages and the API validation all read from here.
  *
+ * Three fields exist for search and sharing rather than for the page itself:
+ *   seo.title        the <title>: name, what kind of game, that it is free
+ *   seo.description  the snippet under a search result, 120-160 characters
+ *   share / ogImage  the line and picture on a link preview. The picture is a
+ *                    1200x630 JPEG made by tools/make-og-images.mjs
+ * tests/seo.test.mjs holds all three to their limits.
+ *
  * To add a game: drop its self-contained build into public/<slug>/ (relative
  * paths only, own service worker), then add an entry with `playable: true`.
  */
@@ -14,10 +21,17 @@ export const GAMES = [
     badge: 'HOT',
     playable: true,
     playPath: '/chicken-attack/',
-    art: '/media/chicken-attack-card.png',
-    stageArt: '/media/chicken-attack-stage.png',
+    art: '/media/chicken-attack-card.webp',
+    stageArt: '/media/chicken-attack-stage.webp',
     icon: '/chicken-attack/icons/icon-192.png',
     tagline: 'Wave survival · v2',
+    seo: {
+      title: 'Chicken Attack — free space shooter online | Beaver Games',
+      description:
+        'Play Chicken Attack free in your browser: a wave-survival space shooter with nine weapons, boss hens and three difficulty modes. No download, no ads.',
+    },
+    share: 'Nine weapons, boss hens and wave after wave of space poultry.',
+    ogImage: '/media/og/chicken-attack.jpg',
     blurb: 'Blast waves of invading space poultry. Nine weapons, boss hens, drumsticks.',
     about: [
       'The galaxy has a poultry problem. Drag your fighter around the screen, hold the line against wave after wave of chickens, and hoover up the drumsticks they leave behind — a hundred of them buys you a spare ship.',
@@ -46,10 +60,17 @@ export const GAMES = [
     badge: 'NEW',
     playable: true,
     playPath: '/beaver-dash/',
-    art: '/media/beaver-dash-card.png',
-    stageArt: '/media/beaver-dash-stage.png',
+    art: '/media/beaver-dash-card.webp',
+    stageArt: '/media/beaver-dash-stage.webp',
     icon: '/beaver-dash/icons/icon-192.png',
     tagline: 'Endless runner · v2',
+    seo: {
+      title: 'Beaver Dash — free one-button endless runner | Beaver Games',
+      description:
+        'Play Beaver Dash free online: a one-button endless runner through a forest that changes weather. Hop, double-jump, tail-slam and chase the weekly board.',
+    },
+    share: 'One button, an endless forest and a very determined beaver.',
+    ogImage: '/media/og/beaver-dash.jpg',
     blurb: 'One button, five different questions. A tap is not the answer to all of them.',
     about: [
       'The dam is downstream and you are late. Sprint through a forest that changes weather as you go — midnight, aurora, cold mist, downpour, storm, ember dawn — and hoover up acorns on the way. Chain them without dropping the thread and the multiplier climbs to five.',
@@ -78,10 +99,17 @@ export const GAMES = [
     badge: 'NEW',
     playable: true,
     playPath: '/orbit-cadet/',
-    art: '/media/orbit-cadet-card.png',
-    stageArt: '/media/orbit-cadet-stage.png',
+    art: '/media/orbit-cadet-card.webp',
+    stageArt: '/media/orbit-cadet-stage.webp',
     icon: '/orbit-cadet/icons/icon-192.png',
     tagline: 'Classic space pinball · v2',
+    seo: {
+      title: 'Orbit Cadet — free space pinball game online | Beaver Games',
+      description:
+        'Play Orbit Cadet free in your browser: classic space pinball with missions, multiball and seven ranks from Cadet to Admiral. Touch or keyboard, no download.',
+    },
+    share: 'Classic space pinball with missions and seven ranks to climb.',
+    ogImage: '/media/og/orbit-cadet.jpg',
     blurb: 'Classic space pinball: chrome rails, glowing bumpers, mission lights, and seven ranks to climb.',
     about: [
       'A pinball table where the point is not the score but the promotion. Roll over the mission target to arm one — clear the drop-target bank, sweep the beacons, run the orbit, work the spinner — and each one you finish moves you up a rank, from Cadet all the way to Admiral. The rank you reach is what goes on the board next to your score.',
@@ -110,10 +138,17 @@ export const GAMES = [
     badge: 'NEW',
     playable: true,
     playPath: '/whittle-wares/',
-    art: '/media/whittle-wares-card.png',
-    stageArt: '/media/whittle-wares-stage.png',
+    art: '/media/whittle-wares-card.webp',
+    stageArt: '/media/whittle-wares-stage.webp',
     icon: '/whittle-wares/icons/icon-192.png',
     tagline: 'A shop for all seasons',
+    seo: {
+      title: 'Whittle & Wares — free shopkeeper RPG game | Beaver Games',
+      description:
+        'Play Whittle & Wares free online: a pixel shopkeeper RPG. Forage, craft, set prices and haggle through four seasons. Saves in your browser, no account.',
+    },
+    share: 'Forage, craft and haggle through four seasons of shopkeeping.',
+    ogImage: '/media/og/whittle-wares.jpg',
     blurb: 'Gather, craft and grow your woodland shop. Four seasons, guild upgrades and a career that keeps going.',
     about: [
       'Build a life at the edge of the wood. Four seasons bring changing demand, harvest bonuses and market caravans. Your journal offers new goals every ten game days, with guild stamps and maker badges to collect. Every morning you walk out to gather — bark and berries near the door, clay and flint at the ford, and ironwood and amber further north than your tools will yet let you go. Stamina is the whole budget: it goes on walking and on gathering, and when it runs out you are carried home with whatever you managed.',
@@ -141,6 +176,13 @@ export const GAMES = [
     slug: 'dam-defender', title: 'Dam Defender', genre: 'Strategy', badge: 'NEW', playable: true,
     playPath: '/dam-defender/', art: '/media/dam-defender-card.svg', stageArt: '/media/dam-defender-card.svg', icon: '/dam-defender/icon.svg',
     tagline: 'Small paws. Big responsibility.',
+    seo: {
+      title: 'Dam Defender — free tower defence game online | Beaver Games',
+      description:
+        'Play Dam Defender free in your browser: woodland tower defence across three rivers with floodgates, perks, bosses and a daily challenge. No download, no ads.',
+    },
+    share: 'Build towers, open the floodgates and protect the village.',
+    ogImage: '/media/og/dam-defender.jpg',
     blurb: 'Build a woodland defence, open the floodgates and protect your beaver village. Three rivers. Endless possibilities.',
     about: [
       'A little village sits behind your dam. Choose where to build acorn turrets, log launchers, bramble gardens, watermills and watchtowers, then defend against waves of woodland raiders. Floods sweep back ground enemies, but flying herons stay above the water. Drain the reservoir too far and your dam becomes vulnerable.',
@@ -171,10 +213,17 @@ export const GAMES = [
     badge: 'NEW',
     playable: true,
     playPath: '/timber-tails/',
-    art: '/media/timber-tails-card.png',
-    stageArt: '/media/timber-tails-stage.png',
+    art: '/media/timber-tails-card.webp',
+    stageArt: '/media/timber-tails-stage.webp',
     icon: '/timber-tails/icon.svg',
     tagline: '8 worlds · 32 stages',
+    seo: {
+      title: 'Timber Tails — free platformer game online | Beaver Games',
+      description:
+        'Play Timber Tails free in your browser: a side-scrolling platformer with 8 worlds, 32 hand-drawn stages and boss fights. Touch, keyboard or gamepad.',
+    },
+    share: 'Eight worlds, thirty-two stages and one very cross boar.',
+    ogImage: '/media/og/timber-tails.jpg',
     blurb: 'Run, jump and tail-slam a beaver kit home. Eight worlds, thirty-two hand-drawn stages, one very cross boar.',
     about: [
       'Pip the beaver kit has been washed a long way downstream, and the lodge is eight worlds off: meadow, burrow, marsh, pine tops, frost, embers, a storm gorge and a moonlit mill. Each world is four stages and each brings its own trouble — bats that drop from the roof, pike that leap from the reeds, rafts and lifts, ice that will not let you stop, geysers on a timer, saw blades on a rail. Land on most things to be rid of them. Not hedgehogs: those need a tail-slam, which is down in mid-air, and which also cracks crates and shakes loose whatever a stash is holding.',
@@ -196,6 +245,51 @@ export const GAMES = [
       'Bristle only hurts himself. Trail him to the wall, then land on him while he sees stars.',
       'Chain landings without touching the ground and each is worth double the last.',
       'A golden log is usually one jump above the path you were about to take.',
+    ],
+  },
+  {
+    slug: 'freedoom',
+    title: 'Freedoom',
+    genre: 'Shooter',
+    badge: 'NEW',
+    playable: true,
+    playPath: '/freedoom/',
+    art: '/media/freedoom-card.webp',
+    stageArt: '/media/freedoom-stage.webp',
+    icon: '/freedoom/icon.svg',
+    tagline: 'Phase 2 · 32 levels',
+    seo: {
+      title: 'Freedoom — free first-person shooter online | Beaver Games',
+      description:
+        'Play Freedoom: Phase 2 free in your browser: the open-source first-person shooter with 32 levels. Mouse and keyboard, touch or gamepad. Nothing to install.',
+    },
+    share: 'The free, open-source first-person shooter. Thirty-two levels.',
+    ogImage: '/media/og/freedoom.jpg',
+    // Not ours: this one is the Freedoom project's game, hosted here. The
+    // game page credits them, and the structured data names them as author.
+    author: { name: 'The Freedoom project', url: 'https://freedoom.github.io/' },
+    blurb: 'The free, open-source first-person shooter. Thirty-two levels of corridors, keys and things that want you dead.',
+    about: [
+      'Freedoom: Phase 2 is a complete first-person shooter made by volunteers and given away: its own thirty-two levels, its own monsters, weapons, art and music, all under a free licence. This is that game, unmodified, running in a browser tab. Find the keys, open the doors, mind your ammunition, and look for the walls that are not quite walls.',
+      'It runs on Crispy Doom, an open-source engine, compiled to WebAssembly for this page. It starts after about 2 MB; the rest of the game, 8 MB in all, downloads behind it while you play, and after that it works offline. The game keeps its own saves and settings on this device, in the menu under Save Game and Options. The arcade adds one thing the game does not have, a score: points for each level finished, more for kills, secrets and speed, and more again on the harder skill levels. A run ends when you die.',
+    ],
+    stats: { rating: '—', size: '8 MB', runTime: '5–15 min a level', players: '1' },
+    meta: { developer: 'Freedoom project', released: '2024 · v0.13', releasedISO: '2024', genreLine: 'Shooter · First-person' },
+    capabilities: ['Mouse', 'Keyboard', 'Touch', 'Gamepad', 'Offline', 'Saves', 'Open source'],
+    controls: [
+      { key: 'W A S D', desc: 'Move and strafe · arrow keys also move and turn' },
+      { key: 'MOUSE', desc: 'Turn. Click the game first to capture the pointer' },
+      { key: 'CLICK', desc: 'Fire · F on the keyboard' },
+      { key: 'E', desc: 'Open doors and press switches · Space does the same' },
+      { key: '1–7', desc: 'Change weapon · or the mouse wheel' },
+      { key: 'ESC', desc: 'Menu: save, load, options, skill level' },
+    ],
+    tips: [
+      'Save often. It is in the menu, and it is not cheating.',
+      'A wall with a slightly different texture is worth pressing Use on.',
+      'Strafing around a corner beats walking round it face first.',
+      'Score counts kills, secrets and pace, and doubles on the hardest skill.',
+      'On a phone, turn it sideways: the picture gets much bigger.',
     ],
   },
 ];

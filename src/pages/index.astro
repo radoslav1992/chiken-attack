@@ -22,15 +22,17 @@ const schema = [
         "@type": "VideoGame",
         name: g.title,
         url: new URL(`/games/${g.slug}/`, Astro.site).href,
-        image: new URL(g.art, Astro.site).href,
-        description: g.blurb,
+        image: new URL(g.ogImage, Astro.site).href,
+        description: g.seo.description,
         genre: g.genre,
         gamePlatform: "Web browser",
         operatingSystem: "Any",
         playMode: "SinglePlayer",
         applicationCategory: "Game",
         datePublished: g.meta.releasedISO,
-        author: { "@id": orgId },
+        author: g.author
+          ? { "@type": "Organization", name: g.author.name, url: g.author.url }
+          : { "@id": orgId },
         offers: {
           "@type": "Offer",
           price: "0",
@@ -51,7 +53,7 @@ const schema = [
 ];
 ---
 
-<Layout title="Beaver Games — small games. Big rematch energy." schema={schema}>
+<Layout title={SITE.title} schema={schema}>
   <div id="top"></div>
   <Header />
   <main id="main" class="arcade-home">
@@ -66,13 +68,13 @@ const schema = [
           </h1>
         </div>
         <p class="lobby-note">
-          {PLAYABLE.length} little worlds. Zero downloads.
+          {PLAYABLE.length} free browser games. Zero downloads.
           <br />
           Pick your next obsession.
         </p>
       </div>
       <div class="lobby-features">
-        <a href="/games/chicken-attack/?play=1" class="feature-game">
+        <a href="/games/chicken-attack/" data-play class="feature-game">
           <img
             src={featured.stageArt}
             alt="Chicken Attack space shooter"
@@ -120,7 +122,8 @@ const schema = [
               Tap, double jump, and try not to become driftwood.
             </p>
             <a
-              href="/games/beaver-dash/?play=1"
+              href="/games/beaver-dash/"
+              data-play
               class="daily-link"
               data-daily-link
             >
@@ -187,7 +190,7 @@ const schema = [
             data-slug={g.slug}
             data-title={g.title.toLowerCase()}
           >
-            <a href={`/games/${g.slug}/?play=1`} class="arcade-card-art">
+            <a href={`/games/${g.slug}/`} data-play class="arcade-card-art">
               <img
                 src={g.art}
                 alt={`${g.title} game art`}
@@ -204,7 +207,7 @@ const schema = [
               </div>
               <div class="arcade-card-title">
                 <h3>
-                  <a href={`/games/${g.slug}/?play=1`}>{g.title}</a>
+                  <a href={`/games/${g.slug}/`} data-play>{g.title}</a>
                 </h3>
                 <button
                   type="button"
@@ -245,7 +248,7 @@ const schema = [
           Finish a run. Share your score challenge. Give a friend something to
           beat.
         </p>
-        <a href="/games/chicken-attack/?play=1" class="arcade-cta">
+        <a href="/games/chicken-attack/" data-play class="arcade-cta">
           Set the score ↗
         </a>
         <p class="board-disclaimer">
@@ -326,6 +329,19 @@ const schema = [
       return [];
     }
   };
+  /* Game links are plain /games/<slug>/ URLs, the same address the sitemap and
+     the canonical tag give, so a crawler never meets a second spelling of a
+     page. A click still skips the poster: the ?play=1 is added here, on the way
+     out, and only for an ordinary click (a new-tab click keeps the clean URL). */
+  document.addEventListener("click", (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a[data-play]");
+    if (!a) return;
+    e.preventDefault();
+    const url = new URL(a.href);
+    url.searchParams.set("play", "1");
+    location.href = url.href;
+  });
   let saved = getSaved();
   let genre = "All";
   let query = "";
@@ -398,7 +414,7 @@ const schema = [
   const desc = document.querySelector("[data-daily-copy]");
   if (desc) desc.textContent = pick.blurb;
   const link = document.querySelector<HTMLAnchorElement>("[data-daily-link]");
-  if (link) link.href = `/games/${pick.slug}/?play=1`;
+  if (link) link.href = `/games/${pick.slug}/`;
   const label = document.querySelector("[data-daily-genre]");
   if (label) label.textContent = pick.genre;
   try {
