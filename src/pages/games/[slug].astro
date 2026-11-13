@@ -18,20 +18,27 @@ const related = PLAYABLE.filter((g) => g.slug !== game.slug);
 
 const orgId = new URL("/#organization", Astro.site).href;
 const pageUrl = new URL(`/games/${game.slug}/`, Astro.site).href;
+// Typed as both: VideoGame says what it is, WebApplication is the type search
+// engines read the "free, runs in a browser" facts from.
 const schema = [
   {
-    "@type": "VideoGame",
+    "@type": ["VideoGame", "WebApplication"],
     "@id": `${pageUrl}#game`,
     name: game.title,
     url: pageUrl,
-    image: new URL(game.stageArt, Astro.site).href,
+    mainEntityOfPage: pageUrl,
+    image: new URL(game.ogImage, Astro.site).href,
+    screenshot: new URL(game.stageArt, Astro.site).href,
     description: [game.blurb, ...game.about].join(" "),
-    genre: game.genre,
+    genre: game.meta.genreLine.split(" · "),
     gamePlatform: "Web browser",
     operatingSystem: "Any",
+    browserRequirements: "Requires JavaScript and HTML5 canvas",
     playMode: "SinglePlayer",
-    applicationCategory: "Game",
-    numberOfPlayers: game.stats.players,
+    applicationCategory: "GameApplication",
+    numberOfPlayers: { "@type": "QuantitativeValue", value: Number(game.stats.players) },
+    inLanguage: SITE.locale,
+    isAccessibleForFree: true,
     datePublished: game.meta.releasedISO,
     dateModified: SITE.updated,
     author: { "@id": orgId },
@@ -59,10 +66,10 @@ const schema = [
 ---
 
 <Layout
-  title={`${game.title} — play free on Beaver Games`}
-  description={game.blurb}
-  image={game.stageArt}
-  imageAlt={`${game.title} title screen`}
+  title={game.seo.title}
+  description={game.seo.description}
+  image={game.ogImage}
+  imageAlt={`${game.title}: ${game.share}`}
   schema={schema}
 >
   <Header variant="game" />
@@ -91,6 +98,8 @@ const schema = [
             class="stage-art"
             src={game.stageArt}
             alt={`${game.title} title screen`}
+            fetchpriority="high"
+            decoding="async"
           />
           <div class="stage-overlay" data-stage-overlay>
             <div class="stage-overlay-inner">
@@ -126,7 +135,7 @@ const schema = [
 
         <p class="share-feedback" data-share-feedback role="status"></p>
         <div class="about-block">
-          <h2 class="h3-display">ABOUT THIS GAME</h2>
+          <h2 class="h3-display">ABOUT {game.title.toUpperCase()}</h2>
           {game.about.map((para) => (
             <p class="about-copy">{para}</p>
           ))}
@@ -229,7 +238,7 @@ const schema = [
 
     <section class="related">
       <div class="wrap related-inner">
-        <h2 class="h3-display">IF YOU LIKED THIS</h2>
+        <h2 class="h3-display">MORE FREE GAMES</h2>
         <div class="related-grid">
           {related.map((g) =>
             g.playable ? (

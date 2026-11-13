@@ -88,6 +88,34 @@ sitemap), `/llms.txt` (the [llms.txt](https://llmstxt.org/) manifest for AI assi
 from `games.js` + `faq.js`), and `/sitemap.xml` (from the playable games list). They live in
 `src/pages/*.txt.js` / `*.xml.js`, not `public/`.
 
+What each page says about itself comes from `src/data/games.js` and `src/data/site.js`, and
+`tests/seo.test.mjs` holds it to the limits below so a new game cannot quietly ship without it:
+
+- **Titles and descriptions.** Each game has `seo.title` (name first, then what kind of game it
+  is and that it is free; 60 characters at most) and `seo.description` (120–160 characters, the
+  snippet under a search result). These are separate from `blurb`, which is written for the card
+  and is too short and too playful to be a search snippet.
+- **One address per page.** Every internal link to a game is the plain `/games/<slug>/` URL — the
+  one in the sitemap and the canonical tag. The lobby still skips the poster on click: links carry
+  `data-play`, and a small handler adds `?play=1` on the way out. Before this, sixteen links on the
+  home page pointed at the `?play=1` spelling, so the URL a crawler followed was never the
+  canonical one.
+- **The playable shells are not rivals to the game pages.** `/timber-tails/` and its siblings are
+  what the stage iframes load, and they are reachable on their own ("Open full page"). Each now
+  carries `<link rel="canonical" href="/games/<slug>/">`, so the page with the description,
+  controls and leaderboard is the one that gets indexed.
+- **Share images.** `ogImage` is a 1200×630 JPEG under 300 KB, made by
+  `tools/make-og-images.mjs` from the card art and the site fonts. Previously the home page shared
+  a square 1.4 MB logo, most games a 16:9 screenshot, and Dam Defender an SVG, which most link
+  previews will not draw at all.
+- **Weight.** Card and stage art is WebP, and the footer uses a 320 px WebP of the logo rather
+  than the 1024 px master. A first visit to the home page went from about 2.7 MB of images to
+  about 0.26 MB. Both body fonts are preloaded and the logo images carry their dimensions, so
+  nothing shifts as the page settles.
+- **Structured data.** Game pages are typed `["VideoGame", "WebApplication"]` with
+  `isAccessibleForFree`, a zero-price offer, a screenshot and the share image; the sitemap lists
+  each page's images; `robots.txt` has one group per agent, each of which keeps `/api/` out.
+
 Two knobs to know about:
 
 - **Canonical origin** — set in `astro.config.mjs` (`site`), overridable with a `SITE_URL` env
@@ -118,7 +146,12 @@ the board, and the games never depend on it (score submission is fire-and-forget
 2. Add an entry in `src/data/games.js` with `playable: true` — the landing catalog and
    `/games/<slug>/` page generate from it.
 3. Add the slug to `KNOWN_GAMES` in `worker/index.js` to open its leaderboard.
-4. Add `_headers` cache rules for the new paths, plus card/stage art in `public/media/`.
+4. Add `_headers` cache rules for the new paths, plus card/stage art in `public/media/` as WebP
+   (or SVG).
+5. Fill in the entry's `seo.title`, `seo.description`, `share` and `ogImage`, put
+   `<link rel="canonical" href="/games/<slug>/" />` in the game's own `index.html`, and run
+   `node tools/make-og-images.mjs` for its share image. `tests/seo.test.mjs` fails until all of
+   that is in place.
 
 ## Layout
 
@@ -140,7 +173,8 @@ public/
   dam-defender/             game — tower defence; data.js and engine.js are pure modules
   timber-tails/             game — platformer; engine.js, build.js and levels.js are pure modules
   fonts/                    self-hosted Bungee, Press Start 2P, Space Grotesk (~49 KB)
-  media/                    cabinet/stage art (captured from real gameplay)
+  media/                    cabinet/stage art (captured from real gameplay), as WebP
+  media/og/                 1200x630 share images, one per page (tools/make-og-images.mjs)
   sw.js                     self-destruct stub migrating pre-Astro installs
   _headers                  security headers + cache policy
 wrangler.jsonc              Workers config: assets + Worker + D1
@@ -148,6 +182,7 @@ tools/make-icons.mjs        Chicken Attack icon set
 tools/make-beaver-icons.mjs Beaver Dash icon set
 tools/make-orbit-icons.mjs  Orbit Cadet icon set
 tools/make-whittle-icons.mjs Whittle & Wares icon set  (npm run icons runs all four)
+tools/make-og-images.mjs    share images for link previews (needs Playwright; see the file)
 ```
 
 ## The brand mark
@@ -161,7 +196,10 @@ cp your-logo.png public/media/beaver-games-logo.png
 npm run build
 ```
 
-Every header and footer picks it up with no code change. `beaver-games-logo.{png,webp,svg}` and
+Every header and footer picks it up with no code change. One catch: the pages prefer
+`beaver-games-logo.webp` and `beaver-games-mark.webp` (small copies, so the footer does not ship
+the 1.4 MB master), so after replacing the PNG either re-encode those two or delete them — with
+no WebP present the PNG is used. `beaver-games-logo.{png,webp,svg}` and
 `logo.{png,svg}` are all accepted, first match wins. A build-time check rather than an `onerror`
 attribute because the site's CSP forbids inline handlers, and it means there is never a 404 for a
 logo that has not been added yet.
